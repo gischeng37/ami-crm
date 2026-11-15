@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AMI CRM — 美國品牌開發</title>
+<style>
+:root{
+  --bg:#f4f6f8; --card:#fff; --ink:#1c2530; --muted:#667085; --line:#dfe4ea;
+  --accent:#0b6fa4; --accent-ink:#fff; --danger:#b42318; --ok:#067647;
+  --chip:#eef4f8; --radius:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang TC","Microsoft JhengHei",sans-serif}
+button{font:inherit;cursor:pointer}
+input,select,textarea{font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;width:100%}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:0;border-color:var(--accent)}
+a{color:var(--accent)}
+.topbar{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;padding:10px 16px;flex-wrap:wrap}
+.topbar h1{font-size:18px;margin:0;white-space:nowrap}
+.topbar .spacer{flex:1}
+.btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:8px;padding:9px 16px}
+.btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.btn.danger{background:var(--danger)}
+.btn.small{padding:6px 10px;font-size:13px}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.wrap{max-width:1180px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:16px}
+.muted{color:var(--muted);font-size:13px}
+.err{color:var(--danger);font-size:13px;min-height:1.2em}
+.ok{color:var(--ok);font-size:13px}
+.hidden{display:none!important}
+/* login */
+.login{max-width:420px;margin:48px auto}
+.login label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4px}
+.login h2{margin:0 0 4px}
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.stat{background:var(--chip);border-radius:8px;padding:10px 12px}
+.stat b{font-size:22px;display:block}
+.stat span{font-size:13px;color:var(--muted)}
+/* filters */
+.filters{display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:10px;align-items:end}
+.filters label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+/* list */
+.row{display:grid;grid-template-columns:2.2fr 1fr .8fr 1fr 1.2fr;gap:10px;align-items:center;padding:12px 8px;border-bottom:1px solid var(--line);cursor:pointer}
+.row:hover{background:#f7fafc}
+.row.head{font-size:12px;color:var(--muted);cursor:default;background:none;font-weight:700}
+.row .nm{font-weight:700}
+.row .dm{color:var(--muted);font-size:13px;word-break:break-all}
+.tag{display:inline-block;background:var(--chip);border-radius:999px;padding:2px 9px;font-size:12px;white-space:nowrap}
+.tag.a{background:#fdecec;color:#b42318;font-weight:700}
+.tag.b{background:#eef4f8;color:#0b6fa4;font-weight:700}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+/* detail overlay */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;display:flex;justify-content:flex-end}
+.panel{background:#fff;width:min(680px,100%);height:100%;overflow-y:auto;padding:18px}
+.panel h2{margin:0 0 2px;word-break:break-all}
+.panel h3{margin:18px 0 8px;font-size:15px;border-bottom:1px solid var(--line);padding-bottom:6px}
+.kv{display:grid;grid-template-columns:150px 1fr;gap:6px 12px;font-size:14px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;word-break:break-word}
+.kv dd a{word-break:break-all}
+.editgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.editgrid .full{grid-column:1/-1}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-top:16px}
+.tabs button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 14px}
+.tabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.subitem{border:1px solid var(--line);border-radius:8px;padding:10px;margin:8px 0;font-size:14px}
+.subitem .meta{color:var(--muted);font-size:12px}
+.formrow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.formrow .full{grid-column:1/-1}
+@media (max-width:768px){
+  .filters{grid-template-columns:1fr 1fr}
+  .filters .full-m{grid-column:1/-1}
+  .row{grid-template-columns:1fr 1fr;row-gap:4px}
+  .row.head{display:none}
+  .kv{grid-template-columns:1fr}
+  .kv dt{margin-top:6px}
+  .editgrid,.formrow{grid-template-columns:1fr}
+  body{font-size:14px}
+}
+@media (max-width:480px){
+  .wrap{padding:10px}
+  .topbar h1{font-size:16px}
+  .filters{grid-template-columns:1fr}
+  .panel{padding:14px}
+  .stat b{font-size:19px}
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <h1 data-i18n="appTitle">AMI CRM — 美國品牌開發</h1>
+  <div class="spacer"></div>
+  <span id="whoami" class="muted"></span>
+  <button id="langBtn" class="btn ghost small" type="button">EN</button>
+  <button id="logoutBtn" class="btn ghost small hidden" type="button" data-i18n="logout">登出</button>
+</header>
+<main class="wrap">
+
+  <!-- 登入 -->
+  <section id="loginView" class="card login">
+    <h2 data-i18n="loginTitle">登入 CRM</h2>
+    <p class="muted" data-i18n="loginHint">使用 Supabase 帳號登入（與主系統 ami-platform 共用帳號）。</p>
+    <label for="email" data-i18n="email">電子郵件</label>
+    <input id="email" type="email" autocomplete="username" placeholder="jack@albertmax.com">
+    <label for="password" data-i18n="password">密碼</label>
+    <input id="password" type="password" autocomplete="current-password" placeholder="••••••••">
+    <div style="height:12px"></div>
+    <button id="loginBtn" class="btn" type="button" style="width:100%" data-i18n="login">登入</button>
+    <p id="loginErr" class="err"></p>
+    <p class="muted" data-i18n="loginNote">帳號由管理員在 Supabase Authentication 建立；登入失敗請確認帳號與密碼。</p>
+  </section>
+
+  <!-- 主畫面 -->
+  <section id="mainView" class="hidden">
+    <div class="card">
+      <div class="stats" id="stats"></div>
+    </div>
+    <div class="card">
+      <div class="filters">
+        <div class="full-m"><label data-i18n="search">搜尋</label><input id="q" type="search" data-i18n-ph="searchPh" placeholder="品牌名稱或網域…"></div>
+        <div><label data-i18n="priority">優先級</label><select id="fPriority"><option value="" data-i18n="all">全部</option><option>A</option><option>B</option><option>C</option></select></div>
+        <div><label data-i18n="stage">階段</label><select id="fStage"><option value="" data-i18n="all">全部</option></select></div>
+        <div><label data-i18n="factory">工廠</label><select id="fFactory"><option value="" data-i18n="all">全部</option></select></div>
+        <div><label data-i18n="format">劑型</label><select id="fFormat"><option value="" data-i18n="all">全部</option></select></div>
+        <div><button id="resetBtn" class="btn ghost" type="button" data-i18n="reset">重設</button></div>
+      </div>
+    </div>
+    <div class="card" style="padding-top:4px">
+      <div id="listMeta" class="muted" style="padding:10px 8px 0"></div>
+      <div class="row head"><span data-i18n="colBrand">品牌</span><span data-i18n="colPriority">優先級</span><span data-i18n="colStage">階段</span><span data-i18n="colFactory">工廠</span><span data-i18n="colContact">聯絡</span></div>
+      <div id="list"></div>
+      <div id="listEmpty" class="empty hidden" data-i18n="noResult">沒有符合的品牌。</div>
+    </div>
+  </section>
+  <p id="msg" class="err"></p>
+</main>
+
+<!-- 明細 -->
+<div id="overlay" class="overlay hidden">
+  <div class="panel" role="dialog" aria-modal="true">
+    <div style="display:flex;gap:8px;justify-content:space-between;align-items:start">
+      <div><h2 id="dName"></h2><div id="dDomain" class="muted"></div></div>
+      <button id="closeBtn" class="btn ghost small" type="button">✕</button>
+    </div>
+    <div id="dTags" style="margin:10px 0"></div>
+    <h3 data-i18n="followup">跟進</h3>
+    <div class="editgrid">
+      <div><label class="muted" data-i18n="stage">階段</label><select id="eStage"></select></div>
+      <div><label class="muted" data-i18n="owner">負責人</label><input id="eOwner" type="text"></div>
+      <div><label class="muted" data-i18n="nextDate">下次跟進日</label><input id="eNextDate" type="date"></div>
+      <div class="full"><label class="muted" data-i18n="nextAction">下一步行動</label><textarea id="eNextAction" rows="2"></textarea></div>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+      <button id="saveBtn" class="btn" type="button" data-i18n="save">儲存跟進</button>
+      <span id="saveMsg" class="ok"></span>
+    </div>
+    <div class="tabs">
+      <button type="button" data-tab="info" class="on" data-i18n="tabInfo">資料</button>
+      <button type="button" data-tab="contacts" data-i18n="tabContacts">聯絡人</button>
+      <button type="button" data-tab="deals" data-i18n="tabDeals">商機</button>
+      <button type="button" data-tab="activities" data-i18n="tabActivities">活動紀錄</button>
+    </div>
+    <div id="tab-info"></div>
+    <div id="tab-contacts" class="hidden"></div>
+    <div id="tab-deals" class="hidden"></div>
+    <div id="tab-activities" class="hidden"></div>
+  </div>
+</div>
+<script>
+"use strict";
+/* 設定：主系統 ami-platform。SB_ANON 由建置腳本從 PROJECT.md 檔案對檔案填入（勿手抄）。 */
+const SB_URL = "https://vrjvebqjarpgodtitoag.supabase.co";
+const SB_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZyanZlYnFqYXJwZ29kdGl0b2FnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI3MTcwNDAsImV4cCI6MjEwODI5MzA0MH0.gnEfIvtv9r-FDyuUyKFJuhqM4m-cKAOPaervu-3a53g";
+const STAGES = ["研究中","初步接觸","洽談中","樣品／報價","成交","暫停","放棄"];
+const DEAL_STAGES = ["初步接觸","洽談中","提案","成交","放棄"];
+const ACT_TYPES = ["電話","郵件","會議","備註","其他"];
+</script>
+<script>
+"use strict";
+/* ---------- i18n ---------- */
+const I18N = {
+  zh: {
+    appTitle:"AMI CRM — 美國品牌開發", logout:"登出",
+    loginTitle:"登入 CRM", loginHint:"使用 Supabase 帳號登入（與主系統 ami-platform 共用帳號）。",
+    email:"電子郵件", password:"密碼", login:"登入",
+    loginNote:"帳號由管理員在 Supabase Authentication 建立；登入失敗請確認帳號與密碼。",
+    loginFail:"登入失敗，請檢查帳號與密碼。", needLogin:"請先登入。",
+    search:"搜尋", searchPh:"品牌名稱或網域…", priority:"優先級", stage:"階段", factory:"工廠", format:"劑型",
+    all:"全部", reset:"重設", colBrand:"品牌", colPriority:"優先級", colStage:"階段", colFactory:"工廠", colContact:"聯絡",
+    noResult:"沒有符合的品牌。", showing:"共 {n} 家，顯示 {m} 家",
+    statTotal:"品牌總數", statStage:"階段：{s}", followup:"跟進", owner:"負責人", nextDate:"下次跟進日",
+    nextAction:"下一步行動", save:"儲存跟進", saved:"已儲存。", saveFail:"儲存失敗：",
+    tabInfo:"資料", tabContacts:"聯絡人", tabDeals:"商機", tabActivities:"活動紀錄",
+    addContact:"新增聯絡人", addDeal:"新增商機", addActivity:"新增活動",
+    cName:"姓名", cRole:"職能", cEmail:"Email", cPhone:"電話", cSource:"來源網址", cAdd:"加入聯絡人",
+    dTitle:"標題", dStage:"階段", dAmount:"金額 (USD)", dClose:"預計成交日", dNotes:"備註", dAdd:"加入商機",
+    aType:"類型", aContent:"內容", aDue:"到期日", aDone:"已完成", aAdd:"加入活動",
+    none:"（尚無）", close:"關閉", loading:"載入中…", loadFail:"載入失敗：",
+    gBasic:"基本資料", gFactory:"工廠", gAds:"廣告", gDemand:"需求", gContact:"聯絡", gFollow:"跟進", gOther:"其他",
+    del:"刪除", delConfirm:"確定刪除這筆？", delFail:"刪除失敗：", addFail:"新增失敗：",
+    noPhone:"—", untitled:"（未命名）"
+  },
+  en: {
+    appTitle:"AMI CRM — US Brand Development", logout:"Log out",
+    loginTitle:"Sign in to CRM", loginHint:"Sign in with your Supabase account (shared with the ami-platform main system).",
+    email:"Email", password:"Password", login:"Sign in",
+    loginNote:"Accounts are created by the admin in Supabase Authentication. If sign-in fails, check your email and password.",
+    loginFail:"Sign-in failed. Check your email and password.", needLogin:"Please sign in first.",
+    search:"Search", searchPh:"Brand name or domain…", priority:"Priority", stage:"Stage", factory:"Factory", format:"Format",
+    all:"All", reset:"Reset", colBrand:"Brand", colPriority:"Priority", colStage:"Stage", colFactory:"Factory", colContact:"Contact",
+    noResult:"No matching brands.", showing:"{n} brands in total, showing {m}",
+    statTotal:"Total brands", statStage:"Stage: {s}", followup:"Follow-up", owner:"Owner", nextDate:"Next follow-up date",
+    nextAction:"Next action", save:"Save follow-up", saved:"Saved.", saveFail:"Save failed: ",
+    tabInfo:"Details", tabContacts:"Contacts", tabDeals:"Deals", tabActivities:"Activities",
+    addContact:"Add contact", addDeal:"Add deal", addActivity:"Add activity",
+    cName:"Name", cRole:"Role", cEmail:"Email", cPhone:"Phone", cSource:"Source URL", cAdd:"Add contact",
+    dTitle:"Title", dStage:"Stage", dAmount:"Amount (USD)", dClose:"Expected close", dNotes:"Notes", dAdd:"Add deal",
+    aType:"Type", aContent:"Content", aDue:"Due date", aDone:"Done", aAdd:"Add activity",
+    none:"(none yet)", close:"Close", loading:"Loading…", loadFail:"Load failed: ",
+    gBasic:"Basics", gFactory:"Factory", gAds:"Advertising", gDemand:"Demand", gContact:"Contact", gFollow:"Follow-up", gOther:"Other",
+    del:"Delete", delConfirm:"Delete this record?", delFail:"Delete failed: ", addFail:"Add failed: ",
+    noPhone:"—", untitled:"(untitled)"
+  }
+};
+/* 欄位標籤（64 欄） */
+const FIELD_LABEL = {
+  id:["編號","ID"], name:["品牌","Brand"], domain:["網域","Domain"], format:["劑型","Format"],
+  segment:["區隔","Segment"], market:["市場","Market"], factory:["工廠","Factory"],
+  factory_note:["工廠備註","Factory note"], factory_url:["工廠來源","Factory source"],
+  factory_checked:["工廠查核日","Factory checked"], parent_check:["母公司查核","Parent check"],
+  ad_status:["廣告狀態","Ad status"], ad_platform:["廣告平台","Ad platform"],
+  ad_url:["廣告連結","Ad URL"], ad_id:["廣告 ID","Ad ID"],
+  ad_observed:["廣告觀察日","Ad observed"], ad_checked:["廣告查核日","Ad checked"],
+  google_status:["Google 狀態","Google status"], google_url:["Google 連結","Google URL"],
+  source:["來源","Source"], priority:["優先級","Priority"], stage:["階段","Stage"],
+  owner:["負責人","Owner"], contact:["聯絡","Contact"], contact_role:["聯絡職能","Contact role"],
+  contact_url:["聯絡連結","Contact URL"], next_date:["下次跟進日","Next follow-up"],
+  next_action:["下一步行動","Next action"], notes:["備註","Notes"],
+  do_not_contact:["勿聯絡","Do not contact"], created:["建立日","Created"],
+  product_url:["產品連結","Product URL"], ownership_url:["所有權來源","Ownership source"],
+  batch:["批次","Batch"], screening:["篩選","Screening"],
+  verification_version:["核實版本","Verification version"],
+  verification_checked:["核實查核日","Verification checked"],
+  review_cohort:["審核批次","Review cohort"], legal_entity:["法定實體","Legal entity"],
+  parent_group:["母集團","Parent group"], ownership_status:["所有權狀態","Ownership status"],
+  parent_note:["母公司備註","Parent note"], demand_status:["需求狀態","Demand status"],
+  demand_note:["需求備註","Demand note"], demand_url:["需求來源","Demand source"],
+  demand_source_date:["需求來源日","Demand source date"],
+  demand_checked:["需求查核日","Demand checked"],
+  procurement_confirmed:["採購已確認","Procurement confirmed"],
+  buyer_reply_url:["買方回覆連結","Buyer reply URL"], buyer_reply_date:["買方回覆日","Buyer reply date"],
+  buyer_target:["目標買方","Buyer target"], buyer_target_url:["目標買方連結","Buyer target URL"],
+  verification_sources:["核實來源","Verification sources"],
+  verification_next:["核實下一步","Verification next"],
+  verification_import_note:["匯入備註","Import note"],
+  target_product:["目標產品","Target product"], us_market_url:["美國市場連結","US market URL"],
+  us_market_note:["美國市場備註","US market note"], brand_aliases:["品牌別名","Brand aliases"],
+  domain_aliases:["網域別名","Domain aliases"], group_key:["集團鍵","Group key"],
+  dedupe_note:["去重備註","Dedupe note"], evidence_reviewed:["證據已審","Evidence reviewed"],
+  discovery_pid:["發現編號","Discovery PID"]
+};
+const FIELD_GROUPS = [
+  ["gBasic",["id","name","domain","format","segment","market","priority","stage","source","batch","screening","verification_version","verification_checked","review_cohort","created","discovery_pid"]],
+  ["gFactory",["factory","factory_note","factory_url","factory_checked","parent_check","parent_group","ownership_status","parent_note"]],
+  ["gAds",["ad_status","ad_platform","ad_url","ad_id","ad_observed","ad_checked","google_status","google_url"]],
+  ["gDemand",["demand_status","demand_note","demand_url","demand_source_date","demand_checked","procurement_confirmed","buyer_reply_url","buyer_reply_date","buyer_target","buyer_target_url"]],
+  ["gContact",["contact","contact_role","contact_url","legal_entity","ownership_url","product_url","target_product","us_market_url","us_market_note"]],
+  ["gFollow",["owner","next_date","next_action","notes","do_not_contact"]],
+  ["gOther",["brand_aliases","domain_aliases","group_key","dedupe_note","verification_sources","verification_next","verification_import_note","evidence_reviewed"]]
+];
+const STAGE_LABEL = { "研究中":["研究中","Research"], "初步接觸":["初步接觸","First contact"], "洽談中":["洽談中","In discussion"], "樣品／報價":["樣品／報價","Sample / Quote"], "成交":["成交","Won"], "暫停":["暫停","Paused"], "放棄":["放棄","Dropped"] };
+
+/* ---------- 狀態 ---------- */
+let lang = localStorage.getItem("crm_lang") || "zh";
+let session = null;
+try { session = JSON.parse(localStorage.getItem("crm_session") || "null"); } catch(e) { session = null; }
+let companies = [];
+let current = null;   // 目前明細公司
+let tab = "info";
+
+const $ = s => document.querySelector(s);
+const t = k => (I18N[lang] && I18N[lang][k]) || I18N.zh[k] || k;
+const fl = f => (FIELD_LABEL[f] ? FIELD_LABEL[f][lang === "en" ? 1 : 0] : f);
+const stageLabel = s => (STAGE_LABEL[s] ? STAGE_LABEL[s][lang === "en" ? 1 : 0] : s);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const isUrl = s => typeof s === "string" && /^https?:\/\//i.test(s.trim());
+
+/* ---------- API ---------- */
+function headers(json) {
+  const h = { "apikey": SB_ANON };
+  if (session && session.access_token) h["Authorization"] = "Bearer " + session.access_token;
+  if (json) h["Content-Type"] = "application/json";
+  if (json) h["Prefer"] = "return=representation";
+  return h;
+}
+async function sb(path, opts) {
+  const res = await fetch(SB_URL + path, opts || {});
+  if (res.status === 401) { signOut(true); throw new Error(t("needLogin")); }
+  if (!res.ok) {
+    let msg = res.status + " " + res.statusText;
+    try { const j = await res.json(); if (j.message) msg = j.message; else if (j.error_description) msg = j.error_description; } catch(e) {}
+    throw new Error(msg);
+  }
+  const txt = await res.text();
+  return txt ? JSON.parse(txt) : null;
+}
+const api = {
+  companies: () => sb("/rest/v1/crm_companies?select=*&order=name.asc&limit=1000"),
+  patchCompany: (id, body) => sb("/rest/v1/crm_companies?id=eq." + encodeURIComponent(id), { method: "PATCH", headers: headers(true), body: JSON.stringify(body) }),
+  list: (table, companyId) => sb("/rest/v1/" + table + "?company_id=eq." + encodeURIComponent(companyId) + "&select=*&order=created_at.desc&limit=200"),
+  add: (table, body) => sb("/rest/v1/" + table, { method: "POST", headers: headers(true), body: JSON.stringify(body) }),
+  del: (table, id) => sb("/rest/v1/" + table + "?id=eq." + encodeURIComponent(id), { method: "DELETE", headers: headers(true) })
+};
+
+/* ---------- 語言 ---------- */
+function applyLang() {
+  document.documentElement.lang = lang === "en" ? "en" : "zh-Hant";
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll("[data-i18n-ph]").forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
+  $("#langBtn").textContent = lang === "en" ? "中文" : "EN";
+  renderStats(); renderList(); renderFilterOptions();
+  if (current) renderDetail(current, true);
+}
+$("#langBtn").addEventListener("click", () => {
+  lang = lang === "en" ? "zh" : "en";
+  localStorage.setItem("crm_lang", lang);
+  applyLang();
+});
+
+/* ---------- 登入 ---------- */
+function showLogin() {
+  $("#loginView").classList.remove("hidden");
+  $("#mainView").classList.add("hidden");
+  $("#logoutBtn").classList.add("hidden");
+  $("#whoami").textContent = "";
+}
+function showMain() {
+  $("#loginView").classList.add("hidden");
+  $("#mainView").classList.remove("hidden");
+  $("#logoutBtn").classList.remove("hidden");
+  $("#whoami").textContent = (session && session.user && session.user.email) || "";
+}
+function signOut(silent) {
+  session = null;
+  localStorage.removeItem("crm_session");
+  companies = []; current = null;
+  closeDetail();
+  showLogin();
+  if (!silent) $("#msg").textContent = "";
+}
+$("#logoutBtn").addEventListener("click", () => signOut(false));
+$("#loginBtn").addEventListener("click", async () => {
+  const email = $("#email").value.trim(), password = $("#password").value;
+  $("#loginErr").textContent = "";
+  $("#loginBtn").disabled = true;
+  try {
+    const res = await fetch(SB_URL + "/auth/v1/token?grant_type=password", {
+      method: "POST",
+      headers: { "apikey": SB_ANON, "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+    const j = await res.json();
+    if (!res.ok) throw new Error(j.error_description || j.msg || j.message || res.statusText);
+    session = { access_token: j.access_token, refresh_token: j.refresh_token, user: j.user };
+    localStorage.setItem("crm_session", JSON.stringify(session));
+    $("#password").value = "";
+    showMain();
+    await loadCompanies();
+  } catch (e) {
+    $("#loginErr").textContent = t("loginFail") + " (" + e.message + ")";
+  } finally {
+    $("#loginBtn").disabled = false;
+  }
+});
+$("#password").addEventListener("keydown", e => { if (e.key === "Enter") $("#loginBtn").click(); });
+</script>
+<script>
+"use strict";
+/* ---------- 清單 ---------- */
+function renderFilterOptions() {
+  const fill = (sel, values) => {
+    const el = $(sel), cur = el.value;
+    const keep = el.querySelector("option[value='']");
+    el.innerHTML = "";
+    el.appendChild(keep);
+    values.forEach(v => { const o = document.createElement("option"); o.value = v; o.textContent = (sel === "#fStage" ? stageLabel(v) : v); el.appendChild(o); });
+    el.value = cur;
+  };
+  const uniq = f => [...new Set(companies.map(c => c[f]).filter(Boolean))].sort();
+  fill("#fStage", STAGES.filter(s => companies.some(c => c.stage === s)));
+  fill("#fFactory", uniq("factory"));
+  fill("#fFormat", uniq("format"));
+  const es = $("#eStage");
+  if (es && !es.options.length) STAGES.forEach(s => { const o = document.createElement("option"); o.value = s; o.textContent = stageLabel(s); es.appendChild(o); });
+  if (es) [...es.options].forEach(o => { o.textContent = stageLabel(o.value); });
+}
+function filtered() {
+  const q = $("#q").value.trim().toLowerCase();
+  const p = $("#fPriority").value, s = $("#fStage").value, fa = $("#fFactory").value, fo = $("#fFormat").value;
+  return companies.filter(c =>
+    (!q || (c.name || "").toLowerCase().includes(q) || (c.domain || "").toLowerCase().includes(q)) &&
+    (!p || c.priority === p) && (!s || c.stage === s) && (!fa || c.factory === fa) && (!fo || c.format === fo));
+}
+function renderStats() {
+  const el = $("#stats");
+  if (!companies.length) { el.innerHTML = ""; return; }
+  const count = f => companies.filter(c => c[f] === f).length;
+  const byPri = ["A","B","C"].map(p => ({ k: p, n: companies.filter(c => c.priority === p).length }));
+  const byStage = {};
+  companies.forEach(c => { byStage[c.stage || "—"] = (byStage[c.stage || "—"] || 0) + 1; });
+  let html = `<div class="stat"><b>${companies.length}</b><span>${esc(t("statTotal"))}</span></div>`;
+  byPri.forEach(x => { html += `<div class="stat"><b>${x.n}</b><span>${esc(t("priority"))} ${esc(x.k)}</span></div>`; });
+  Object.keys(byStage).sort().forEach(s => { html += `<div class="stat"><b>${byStage[s]}</b><span>${esc(t("statStage").replace("{s}", stageLabel(s)))}</span></div>`; });
+  el.innerHTML = html;
+}
+function renderList() {
+  const list = filtered();
+  $("#listMeta").textContent = t("showing").replace("{n}", companies.length).replace("{m}", list.length);
+  const box = $("#list");
+  box.innerHTML = "";
+  $("#listEmpty").classList.toggle("hidden", list.length > 0);
+  list.slice(0, 200).forEach(c => {
+    const d = document.createElement("div");
+    d.className = "row";
+    d.innerHTML =
+      `<span><span class="nm">${esc(c.name || t("untitled"))}</span><br><span class="dm">${esc(c.domain || "")}</span></span>` +
+      `<span><span class="tag ${c.priority === "A" ? "a" : "b"}">${esc(c.priority || "")}</span></span>` +
+      `<span>${esc(stageLabel(c.stage || ""))}</span>` +
+      `<span>${esc(c.factory || "")}</span>` +
+      `<span class="dm">${esc(c.contact || "")}</span>`;
+    d.addEventListener("click", () => openDetail(c));
+    box.appendChild(d);
+  });
+  if (list.length > 200) {
+    const more = document.createElement("div");
+    more.className = "empty";
+    more.textContent = "… +" + (list.length - 200);
+    box.appendChild(more);
+  }
+}
+async function loadCompanies() {
+  $("#msg").textContent = t("loading");
+  try {
+    companies = await api.companies();
+    $("#msg").textContent = "";
+    renderFilterOptions(); renderStats(); renderList();
+  } catch (e) {
+    $("#msg").textContent = t("loadFail") + e.message;
+  }
+}
+["q","fPriority","fStage","fFactory","fFormat"].forEach(id => {
+  $("#" + id).addEventListener("input", renderList);
+  $("#" + id).addEventListener("change", renderList);
+});
+$("#resetBtn").addEventListener("click", () => {
+  $("#q").value = ""; $("#fPriority").value = ""; $("#fStage").value = ""; $("#fFactory").value = ""; $("#fFormat").value = "";
+  renderList();
+});
+
+/* ---------- 明細 ---------- */
+function fieldVal(c, f) {
+  const v = c[f];
+  if (v == null || v === "") return "—";
+  if (isUrl(v)) return `<a href="${esc(v)}" target="_blank" rel="noopener">${esc(v)}</a>`;
+  return esc(v);
+}
+function renderDetail(c, keepTab) {
+  current = c;
+  $("#dName").textContent = c.name || t("untitled");
+  $("#dDomain").textContent = c.domain || "";
+  $("#dTags").innerHTML =
+    `<span class="tag ${c.priority === "A" ? "a" : "b"}">${esc(c.priority || "")}</span> ` +
+    `<span class="tag">${esc(stageLabel(c.stage || ""))}</span> ` +
+    `<span class="tag">${esc(c.factory || "")}</span> ` +
+    `<span class="tag">${esc(c.format || "")}</span>`;
+  $("#eStage").value = c.stage || "研究中";
+  $("#eOwner").value = c.owner || "";
+  $("#eNextDate").value = c.next_date || "";
+  $("#eNextAction").value = c.next_action || "";
+  $("#saveMsg").textContent = "";
+  let html = "";
+  FIELD_GROUPS.forEach(([g, fields]) => {
+    html += `<h3>${esc(t(g))}</h3><dl class="kv">`;
+    fields.forEach(f => { html += `<dt>${esc(fl(f))}</dt><dd>${fieldVal(c, f)}</dd>`; });
+    html += `</dl>`;
+  });
+  $("#tab-info").innerHTML = html;
+  document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === tab));
+  ["info","contacts","deals","activities"].forEach(x => $("#tab-" + x).classList.toggle("hidden", x !== tab));
+  if (tab !== "info") loadSubtab(tab);
+}
+function openDetail(c) {
+  tab = "info";
+  renderDetail(c);
+  $("#overlay").classList.remove("hidden");
+  document.body.style.overflow = "hidden";
+}
+function closeDetail() {
+  $("#overlay").classList.add("hidden");
+  document.body.style.overflow = "";
+  current = null;
+}
+$("#closeBtn").addEventListener("click", closeDetail);
+$("#overlay").addEventListener("click", e => { if (e.target.id === "overlay") closeDetail(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeDetail(); });
+document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => {
+  tab = b.dataset.tab;
+  if (current) renderDetail(current, true);
+}));
+$("#saveBtn").addEventListener("click", async () => {
+  if (!current) return;
+  $("#saveBtn").disabled = true;
+  $("#saveMsg").textContent = "";
+  const body = {
+    stage: $("#eStage").value,
+    owner: $("#eOwner").value.trim() || null,
+    next_date: $("#eNextDate").value || null,
+    next_action: $("#eNextAction").value.trim() || null
+  };
+  try {
+    const updated = await api.patchCompany(current.id, body);
+    const row = Array.isArray(updated) ? updated[0] : updated;
+    if (row) {
+      const i = companies.findIndex(x => x.id === current.id);
+      if (i >= 0) companies[i] = row;
+      current = row;
+    } else {
+      Object.assign(current, body);
+    }
+    $("#saveMsg").textContent = t("saved");
+    renderStats(); renderList(); renderDetail(current, true);
+  } catch (e) {
+    $("#saveMsg").textContent = t("saveFail") + e.message;
+    $("#saveMsg").className = "err";
+    setTimeout(() => { $("#saveMsg").className = "ok"; }, 4000);
+  } finally {
+    $("#saveBtn").disabled = false;
+  }
+});
+</script>
+<script>
+"use strict";
+/* ---------- 聯絡人／商機／活動 ---------- */
+function subForm(kind) {
+  if (kind === "contacts") return `
+    <h3>${esc(t("addContact"))}</h3>
+    <div class="formrow">
+      <div><label class="muted">${esc(t("cName"))}</label><input id="n_name" type="text"></div>
+      <div><label class="muted">${esc(t("cRole"))}</label><input id="n_role" type="text"></div>
+      <div><label class="muted">${esc(t("cEmail"))}</label><input id="n_email" type="email"></div>
+      <div><label class="muted">${esc(t("cPhone"))}</label><input id="n_phone" type="text"></div>
+      <div class="full"><label class="muted">${esc(t("cSource"))}</label><input id="n_source_url" type="url" placeholder="https://"></div>
+    </div>
+    <button class="btn" type="button" data-add="contacts">${esc(t("cAdd"))}</button>`;
+  if (kind === "deals") return `
+    <h3>${esc(t("addDeal"))}</h3>
+    <div class="formrow">
+      <div class="full"><label class="muted">${esc(t("dTitle"))}</label><input id="n_title" type="text"></div>
+      <div><label class="muted">${esc(t("dStage"))}</label><select id="n_stage">${DEAL_STAGES.map(s => `<option>${esc(stageLabel(s))}</option>`).join("")}</select></div>
+      <div><label class="muted">${esc(t("dAmount"))}</label><input id="n_amount" type="number" min="0" step="0.01"></div>
+      <div><label class="muted">${esc(t("dClose"))}</label><input id="n_expected_close" type="date"></div>
+      <div class="full"><label class="muted">${esc(t("dNotes"))}</label><textarea id="n_notes" rows="2"></textarea></div>
+    </div>
+    <button class="btn" type="button" data-add="deals">${esc(t("dAdd"))}</button>`;
+  return `
+    <h3>${esc(t("addActivity"))}</h3>
+    <div class="formrow">
+      <div><label class="muted">${esc(t("aType"))}</label><select id="n_type">${ACT_TYPES.map(s => `<option>${esc(s)}</option>`).join("")}</select></div>
+      <div><label class="muted">${esc(t("aDue"))}</label><input id="n_due_date" type="date"></div>
+      <div class="full"><label class="muted">${esc(t("aContent"))}</label><textarea id="n_content" rows="2"></textarea></div>
+      <div><label><input id="n_done" type="checkbox" style="width:auto"> ${esc(t("aDone"))}</label></div>
+    </div>
+    <button class="btn" type="button" data-add="activities">${esc(t("aAdd"))}</button>`;
+}
+function subItem(kind, r) {
+  const del = `<button class="btn ghost small" type="button" data-del="${kind}" data-id="${esc(r.id)}">${esc(t("del"))}</button>`;
+  if (kind === "contacts") return `<div class="subitem"><b>${esc(r.name || t("untitled"))}</b> ${r.role ? "· " + esc(r.role) : ""}<br>
+    <span class="meta">${esc([r.email, r.phone].filter(Boolean).join(" / ") || t("noPhone"))}${r.source_url ? ` · <a href="${esc(r.source_url)}" target="_blank" rel="noopener">${esc(t("cSource"))}</a>` : ""}</span>
+    <div style="margin-top:6px">${del}</div></div>`;
+  if (kind === "deals") return `<div class="subitem"><b>${esc(r.title || t("untitled"))}</b> · ${esc(stageLabel(r.stage || ""))}${r.amount != null ? " · $" + Number(r.amount).toLocaleString() : ""}${r.expected_close ? " · " + esc(r.expected_close) : ""}<br>
+    <span class="meta">${esc(r.notes || "")}</span>
+    <div style="margin-top:6px">${del}</div></div>`;
+  return `<div class="subitem"><b>${esc(r.type || "")}</b>${r.done ? " ✓" : ""}${r.due_date ? " · " + esc(r.due_date) : ""}<br>
+    <span>${esc(r.content || "")}</span>
+    <div style="margin-top:6px">${del}</div></div>`;
+}
+async function loadSubtab(kind) {
+  const box = $("#tab-" + kind);
+  box.innerHTML = `<p class="muted">${esc(t("loading"))}</p>`;
+  try {
+    const table = kind === "contacts" ? "crm_contacts" : kind === "deals" ? "crm_deals" : "crm_activities";
+    const rows = await api.list(table, current.id);
+    let html = subForm(kind) + `<p class="err" id="subErr"></p>`;
+    html += rows.length ? rows.map(r => subItem(kind, r)).join("") : `<p class="muted">${esc(t("none"))}</p>`;
+    box.innerHTML = html;
+    box.querySelector("[data-add]").addEventListener("click", () => addSub(kind, table));
+    box.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", () => delSub(kind, table, b.dataset.id)));
+  } catch (e) {
+    box.innerHTML = `<p class="err">${esc(t("loadFail"))}${esc(e.message)}</p>`;
+  }
+}
+async function addSub(kind, table) {
+  const err = $("#subErr");
+  const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
+  let body = { company_id: current.id };
+  if (kind === "contacts") {
+    body = { ...body, name: val("n_name") || null, role: val("n_role") || null, email: val("n_email") || null, phone: val("n_phone") || null, source_url: val("n_source_url") || null };
+    if (!body.name && !body.email) { err.textContent = t("cName") + " / " + t("cEmail"); return; }
+  } else if (kind === "deals") {
+    const stageSel = document.getElementById("n_stage");
+    const stageVal = DEAL_STAGES[stageSel.selectedIndex] || "初步接觸";
+    body = { ...body, title: val("n_title") || null, stage: stageVal, amount: val("n_amount") ? Number(val("n_amount")) : null, expected_close: val("n_expected_close") || null, notes: val("n_notes") || null };
+    if (!body.title) { err.textContent = t("dTitle"); return; }
+  } else {
+    const typeSel = document.getElementById("n_type");
+    body = { ...body, type: ACT_TYPES[typeSel.selectedIndex] || "備註", content: val("n_content") || null, due_date: val("n_due_date") || null, done: !!document.getElementById("n_done").checked, created_by: session && session.user ? session.user.id : null };
+  }
+  try {
+    await api.add(table, body);
+    loadSubtab(kind);
+  } catch (e) {
+    err.textContent = t("addFail") + e.message;
+  }
+}
+async function delSub(kind, table, id) {
+  if (!confirm(t("delConfirm"))) return;
+  try {
+    await api.del(table, id);
+    loadSubtab(kind);
+  } catch (e) {
+    const err = $("#subErr");
+    if (err) err.textContent = t("delFail") + e.message;
+    else alert(t("delFail") + e.message);
+  }
+}
+
+/* ---------- 啟動 ---------- */
+applyLang();
+if (session && session.access_token) {
+  showMain();
+  loadCompanies();
+} else {
+  showLogin();
+}
+</script>
+</body>
+</html>
