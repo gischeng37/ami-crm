@@ -339,9 +339,9 @@ async function sb(path, opts) {
   return txt ? JSON.parse(txt) : null;
 }
 const api = {
-  companies: () => sb("/rest/v1/crm_companies?select=*&order=name.asc&limit=1000"),
+  companies: () => sb("/rest/v1/crm_companies?select=*&order=name.asc&limit=1000", { headers: headers() }),
   patchCompany: (id, body) => sb("/rest/v1/crm_companies?id=eq." + encodeURIComponent(id), { method: "PATCH", headers: headers(true), body: JSON.stringify(body) }),
-  list: (table, companyId) => sb("/rest/v1/" + table + "?company_id=eq." + encodeURIComponent(companyId) + "&select=*&order=created_at.desc&limit=200"),
+  list: (table, companyId) => sb("/rest/v1/" + table + "?company_id=eq." + encodeURIComponent(companyId) + "&select=*&order=created_at.desc&limit=200", { headers: headers() }),
   add: (table, body) => sb("/rest/v1/" + table, { method: "POST", headers: headers(true), body: JSON.stringify(body) }),
   del: (table, id) => sb("/rest/v1/" + table + "?id=eq." + encodeURIComponent(id), { method: "DELETE", headers: headers(true) })
 };
