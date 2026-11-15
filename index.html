@@ -111,7 +111,23 @@ a{color:var(--accent)}
     <div style="height:12px"></div>
     <button id="loginBtn" class="btn" type="button" style="width:100%" data-i18n="login">登入</button>
     <p id="loginErr" class="err"></p>
+    <p style="text-align:center;margin:6px 0 0"><a href="#" id="forgotLink" data-i18n="forgotPw">忘記密碼？</a></p>
+    <p id="forgotMsg" class="ok" style="text-align:center"></p>
     <p class="muted" data-i18n="loginNote">帳號由管理員在 Supabase Authentication 建立；登入失敗請確認帳號與密碼。</p>
+  </section>
+
+  <!-- 重設密碼（由重設信連結進入） -->
+  <section id="resetView" class="card login hidden">
+    <h2 data-i18n="resetTitle">設定新密碼</h2>
+    <p class="muted" data-i18n="resetHint">請設定一組新密碼，之後用這組密碼登入 CRM。</p>
+    <label for="newPw" data-i18n="newPassword">新密碼</label>
+    <input id="newPw" type="password" autocomplete="new-password" placeholder="••••••••">
+    <label for="newPw2" data-i18n="confirmPassword">確認新密碼</label>
+    <input id="newPw2" type="password" autocomplete="new-password" placeholder="••••••••">
+    <div style="height:12px"></div>
+    <button id="setPwBtn" class="btn" type="button" style="width:100%" data-i18n="setPassword">設定新密碼</button>
+    <p id="resetErr" class="err"></p>
+    <p id="resetOk" class="ok"></p>
   </section>
 
   <!-- 主畫面 -->
@@ -189,6 +205,13 @@ const I18N = {
     email:"電子郵件", password:"密碼", login:"登入",
     loginNote:"帳號由管理員在 Supabase Authentication 建立；登入失敗請確認帳號與密碼。",
     loginFail:"登入失敗，請檢查帳號與密碼。", needLogin:"請先登入。",
+    resetTitle:"設定新密碼", resetHint:"請設定一組新密碼，之後用這組密碼登入 CRM。",
+    newPassword:"新密碼", confirmPassword:"確認新密碼", setPassword:"設定新密碼",
+    resetSuccess:"密碼已更新，請用新密碼登入。", resetFail:"設定失敗：",
+    resetMismatch:"兩次輸入的新密碼不一致。", resetShort:"新密碼至少 6 個字元。",
+    resetExpired:"這個重設連結已失效，請重新申請一封重設信。",
+    forgotPw:"忘記密碼？", forgotSent:"重設信已寄出，請去信箱點連結。",
+    forgotNeedEmail:"請先輸入電子郵件。", forgotFail:"寄送失敗：",
     search:"搜尋", searchPh:"品牌名稱或網域…", priority:"優先級", stage:"階段", factory:"工廠", format:"劑型",
     all:"全部", reset:"重設", colBrand:"品牌", colPriority:"優先級", colStage:"階段", colFactory:"工廠", colContact:"聯絡",
     noResult:"沒有符合的品牌。", showing:"共 {n} 家，顯示 {m} 家",
@@ -210,6 +233,13 @@ const I18N = {
     email:"Email", password:"Password", login:"Sign in",
     loginNote:"Accounts are created by the admin in Supabase Authentication. If sign-in fails, check your email and password.",
     loginFail:"Sign-in failed. Check your email and password.", needLogin:"Please sign in first.",
+    resetTitle:"Set a new password", resetHint:"Choose a new password, then sign in to CRM with it.",
+    newPassword:"New password", confirmPassword:"Confirm new password", setPassword:"Set new password",
+    resetSuccess:"Password updated. Please sign in with your new password.", resetFail:"Failed to set password: ",
+    resetMismatch:"The two passwords do not match.", resetShort:"The new password must be at least 6 characters.",
+    resetExpired:"This reset link has expired. Please request a new reset email.",
+    forgotPw:"Forgot password?", forgotSent:"Reset email sent. Check your inbox for the link.",
+    forgotNeedEmail:"Enter your email first.", forgotFail:"Failed to send: ",
     search:"Search", searchPh:"Brand name or domain…", priority:"Priority", stage:"Stage", factory:"Factory", format:"Format",
     all:"All", reset:"Reset", colBrand:"Brand", colPriority:"Priority", colStage:"Stage", colFactory:"Factory", colContact:"Contact",
     noResult:"No matching brands.", showing:"{n} brands in total, showing {m}",
@@ -377,6 +407,87 @@ $("#loginBtn").addEventListener("click", async () => {
   }
 });
 $("#password").addEventListener("keydown", e => { if (e.key === "Enter") $("#loginBtn").click(); });
+
+/* ---------- 重設密碼（recovery 連結） ---------- */
+function parseHashParams() {
+  const h = location.hash || "";
+  if (!h.startsWith("#")) return new URLSearchParams();
+  return new URLSearchParams(h.slice(1));
+}
+async function handleRecoveryHash() {
+  const p = parseHashParams();
+  if (p.get("type") !== "recovery" || !p.get("access_token")) return false;
+  const access = p.get("access_token"), refresh = p.get("refresh_token") || "";
+  try {
+    const res = await fetch(SB_URL + "/auth/v1/user", {
+      headers: { "apikey": SB_ANON, "Authorization": "Bearer " + access }
+    });
+    const j = await res.json();
+    if (!res.ok) throw new Error(j.error_description || j.msg || j.message || res.statusText);
+    session = { access_token: access, refresh_token: refresh, user: j };
+    localStorage.setItem("crm_session", JSON.stringify(session));
+    history.replaceState(null, "", location.pathname + location.search);
+    $("#loginView").classList.add("hidden");
+    $("#mainView").classList.add("hidden");
+    $("#logoutBtn").classList.add("hidden");
+    $("#resetView").classList.remove("hidden");
+    return true;
+  } catch (e) {
+    history.replaceState(null, "", location.pathname + location.search);
+    showLogin();
+    $("#loginErr").textContent = t("resetExpired") + " (" + e.message + ")";
+    return true;
+  }
+}
+$("#setPwBtn").addEventListener("click", async () => {
+  const pw1 = $("#newPw").value, pw2 = $("#newPw2").value;
+  $("#resetErr").textContent = "";
+  $("#resetOk").textContent = "";
+  if (pw1.length < 6) { $("#resetErr").textContent = t("resetShort"); return; }
+  if (pw1 !== pw2) { $("#resetErr").textContent = t("resetMismatch"); return; }
+  $("#setPwBtn").disabled = true;
+  try {
+    const res = await fetch(SB_URL + "/auth/v1/user", {
+      method: "PUT",
+      headers: { "apikey": SB_ANON, "Authorization": "Bearer " + session.access_token, "Content-Type": "application/json" },
+      body: JSON.stringify({ password: pw1 })
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error_description || j.msg || j.message || res.statusText);
+    const em = (session && session.user && session.user.email) || "";
+    $("#resetOk").textContent = t("resetSuccess");
+    $("#newPw").value = "";
+    $("#newPw2").value = "";
+    setTimeout(() => {
+      $("#resetView").classList.add("hidden");
+      signOut(true);
+      $("#email").value = em;
+    }, 1200);
+  } catch (e) {
+    $("#resetErr").textContent = t("resetFail") + e.message;
+  } finally {
+    $("#setPwBtn").disabled = false;
+  }
+});
+$("#forgotLink").addEventListener("click", async e => {
+  e.preventDefault();
+  const email = $("#email").value.trim();
+  $("#forgotMsg").textContent = "";
+  $("#loginErr").textContent = "";
+  if (!email) { $("#loginErr").textContent = t("forgotNeedEmail"); return; }
+  try {
+    const res = await fetch(SB_URL + "/auth/v1/recover", {
+      method: "POST",
+      headers: { "apikey": SB_ANON, "Content-Type": "application/json" },
+      body: JSON.stringify({ email })
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error_description || j.msg || j.message || res.statusText);
+    $("#forgotMsg").textContent = t("forgotSent");
+  } catch (err) {
+    $("#loginErr").textContent = t("forgotFail") + err.message;
+  }
+});
 </script>
 <script>
 "use strict";
@@ -640,12 +751,15 @@ async function delSub(kind, table, id) {
 
 /* ---------- 啟動 ---------- */
 applyLang();
-if (session && session.access_token) {
-  showMain();
-  loadCompanies();
-} else {
-  showLogin();
-}
+handleRecoveryHash().then(inRecovery => {
+  if (inRecovery) return;
+  if (session && session.access_token) {
+    showMain();
+    loadCompanies();
+  } else {
+    showLogin();
+  }
+});
 </script>
 </body>
 </html>
