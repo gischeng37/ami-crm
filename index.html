@@ -69,6 +69,22 @@ a{color:var(--accent)}
 .tabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .subitem{border:1px solid var(--line);border-radius:8px;padding:10px;margin:8px 0;font-size:14px}
 .subitem .meta{color:var(--muted);font-size:12px}
+/* 主畫面分頁（品牌主檔／名單池） */
+.viewtabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.viewtabs button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 18px;font-weight:700}
+.viewtabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+/* 名單池 */
+.lfilters{display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:10px;align-items:end}
+.lfilters label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+.lrow{display:grid;grid-template-columns:2fr 1.1fr .8fr .8fr .5fr .9fr 1.7fr;gap:10px;align-items:center;padding:12px 8px;border-bottom:1px solid var(--line)}
+.lrow:hover{background:#f7fafc}
+.lrow.head{font-size:12px;color:var(--muted);cursor:default;background:none;font-weight:700}
+.lrow .nm{font-weight:700}
+.lrow .dm{color:var(--muted);font-size:13px;word-break:break-all}
+.lrow .num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.lrow .acts{display:flex;gap:6px;flex-wrap:wrap}
+.tag.green{background:#e6f4ea;color:#067647;font-weight:700}
+.tag.grey{background:#eceef0;color:#667085;font-weight:700}
 .formrow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
 .formrow .full{grid-column:1/-1}
 @media (max-width:768px){
@@ -76,6 +92,12 @@ a{color:var(--accent)}
   .filters .full-m{grid-column:1/-1}
   .row{grid-template-columns:1fr 1fr;row-gap:4px}
   .row.head{display:none}
+  .lfilters{grid-template-columns:1fr 1fr}
+  .lfilters .full-m{grid-column:1/-1}
+  .lrow{grid-template-columns:1fr 1fr;row-gap:4px}
+  .lrow.head{display:none}
+  .lrow .acts{grid-column:1/-1}
+  .lrow [data-l]::before{content:attr(data-l) "：";color:var(--muted);font-size:12px}
   .kv{grid-template-columns:1fr}
   .kv dt{margin-top:6px}
   .editgrid,.formrow{grid-template-columns:1fr}
@@ -85,6 +107,7 @@ a{color:var(--accent)}
   .wrap{padding:10px}
   .topbar h1{font-size:16px}
   .filters{grid-template-columns:1fr}
+  .lfilters{grid-template-columns:1fr}
   .panel{padding:14px}
   .stat b{font-size:19px}
 }
@@ -132,6 +155,11 @@ a{color:var(--accent)}
 
   <!-- 主畫面 -->
   <section id="mainView" class="hidden">
+    <div class="viewtabs">
+      <button id="viewCompaniesBtn" type="button" class="on" data-i18n="tabCompanies">品牌主檔</button>
+      <button id="viewLeadsBtn" type="button" data-i18n="tabLeads">名單池</button>
+    </div>
+    <div id="companiesView">
     <div class="card">
       <div class="stats" id="stats"></div>
     </div>
@@ -150,6 +178,29 @@ a{color:var(--accent)}
       <div class="row head"><span data-i18n="colBrand">品牌</span><span data-i18n="colPriority">優先級</span><span data-i18n="colStage">階段</span><span data-i18n="colFactory">工廠</span><span data-i18n="colContact">聯絡</span></div>
       <div id="list"></div>
       <div id="listEmpty" class="empty hidden" data-i18n="noResult">沒有符合的品牌。</div>
+    </div>
+    </div>
+    <!-- 名單池 -->
+    <div id="leadsView" class="hidden">
+      <div class="card">
+        <div class="stats" id="leadsStats"></div>
+      </div>
+      <div class="card">
+        <div class="lfilters">
+          <div class="full-m"><label data-i18n="search">搜尋</label><input id="lq" type="search" data-i18n-ph="leadSearchPh" placeholder="品牌名稱…"></div>
+          <div><label data-i18n="leadBand">營收級距</label><select id="fBand"><option value="" data-i18n="all">全部</option><option value="A1">A1</option><option value="A2">A2</option></select></div>
+          <div><label data-i18n="leadTier">級別</label><select id="fTier"><option value="" data-i18n="all">全部</option><option>7</option><option>8</option><option>9</option><option>10</option></select></div>
+          <div><label data-i18n="leadStatus">狀態</label><select id="fStatus"><option value="" data-i18n="all">全部</option><option value="new" data-i18n="leadStNew">新名單</option><option value="qualified" data-i18n="leadStQualified">已篩選</option><option value="promoted" data-i18n="leadStPromoted">已晉升</option><option value="rejected" data-i18n="leadStRejected">已拒絕</option></select></div>
+          <div><button id="lResetBtn" class="btn ghost" type="button" data-i18n="reset">重設</button></div>
+        </div>
+      </div>
+      <div class="card" style="padding-top:4px">
+        <div id="leadsMeta" class="muted" style="padding:10px 8px 0"></div>
+        <div class="lrow head"><span data-i18n="colBrand">品牌</span><span data-i18n="colRevenue">月營收</span><span data-i18n="colSales">月銷量</span><span data-i18n="colBand">級距</span><span data-i18n="colTier">級別</span><span data-i18n="colStatus">狀態</span><span data-i18n="colActions">操作</span></div>
+        <div id="leadsList"></div>
+        <div id="leadsEmpty" class="empty hidden" data-i18n="leadNoResult">沒有符合的名單。</div>
+      </div>
+      <p id="leadsMsg" class="err"></p>
     </div>
   </section>
   <p id="msg" class="err"></p>
@@ -225,7 +276,18 @@ const I18N = {
     none:"（尚無）", close:"關閉", loading:"載入中…", loadFail:"載入失敗：",
     gBasic:"基本資料", gFactory:"工廠", gAds:"廣告", gDemand:"需求", gContact:"聯絡", gFollow:"跟進", gOther:"其他",
     del:"刪除", delConfirm:"確定刪除這筆？", delFail:"刪除失敗：", addFail:"新增失敗：",
-    noPhone:"—", untitled:"（未命名）"
+    noPhone:"—", untitled:"（未命名）",
+    tabCompanies:"品牌主檔", tabLeads:"名單池",
+    leadBand:"營收級距", leadTier:"級別", leadStatus:"狀態", leadSearchPh:"品牌名稱…",
+    colRevenue:"月營收", colSales:"月銷量", colBand:"級距", colTier:"級別", colStatus:"狀態", colActions:"操作",
+    leadStNew:"新名單", leadStQualified:"已篩選", leadStPromoted:"已晉升", leadStRejected:"已拒絕",
+    leadPromote:"晉升", leadReject:"拒絕",
+    leadPromoteConfirm:"確定將「{b}」晉升到品牌主檔？", leadRejectConfirm:"確定拒絕「{b}」？",
+    leadPromoted:"已晉升到品牌主檔。", leadRejected:"已拒絕。",
+    leadPromotedPartial:"品牌已建立，但名單狀態更新失敗（請在 Supabase 手動將此名單改為已晉升）：",
+    leadActionFail:"操作失敗：", leadNoDomain:"這家沒有網域，無法晉升（主檔網域為必填且唯一，請先補網域）。",
+    leadNoResult:"沒有符合的名單。", leadShowing:"名單共 {n} 筆，顯示 {m} 筆",
+    leadStatTotal:"名單總數", leadStatNew:"新名單", leadStatPromoted:"已晉升"
   },
   en: {
     appTitle:"AMI CRM — US Brand Development", logout:"Log out",
@@ -253,7 +315,18 @@ const I18N = {
     none:"(none yet)", close:"Close", loading:"Loading…", loadFail:"Load failed: ",
     gBasic:"Basics", gFactory:"Factory", gAds:"Advertising", gDemand:"Demand", gContact:"Contact", gFollow:"Follow-up", gOther:"Other",
     del:"Delete", delConfirm:"Delete this record?", delFail:"Delete failed: ", addFail:"Add failed: ",
-    noPhone:"—", untitled:"(untitled)"
+    noPhone:"—", untitled:"(untitled)",
+    tabCompanies:"Companies", tabLeads:"Leads",
+    leadBand:"Revenue band", leadTier:"Tier", leadStatus:"Status", leadSearchPh:"Brand name…",
+    colRevenue:"Monthly revenue", colSales:"Monthly sales", colBand:"Band", colTier:"Tier", colStatus:"Status", colActions:"Actions",
+    leadStNew:"New", leadStQualified:"Qualified", leadStPromoted:"Promoted", leadStRejected:"Rejected",
+    leadPromote:"Promote", leadReject:"Reject",
+    leadPromoteConfirm:"Promote “{b}” to the companies list?", leadRejectConfirm:"Reject “{b}”?",
+    leadPromoted:"Promoted to companies.", leadRejected:"Rejected.",
+    leadPromotedPartial:"Company was created, but the lead status update failed (set this lead to promoted manually in Supabase): ",
+    leadActionFail:"Action failed: ", leadNoDomain:"This lead has no domain, so it cannot be promoted (company domain is required and unique — add a domain first).",
+    leadNoResult:"No matching leads.", leadShowing:"{n} leads in total, showing {m}",
+    leadStatTotal:"Total leads", leadStatNew:"New", leadStatPromoted:"Promoted"
   }
 };
 /* 欄位標籤（64 欄） */
@@ -303,6 +376,12 @@ const FIELD_GROUPS = [
   ["gOther",["brand_aliases","domain_aliases","group_key","dedupe_note","verification_sources","verification_next","verification_import_note","evidence_reviewed"]]
 ];
 const STAGE_LABEL = { "研究中":["研究中","Research"], "初步接觸":["初步接觸","First contact"], "洽談中":["洽談中","In discussion"], "樣品／報價":["樣品／報價","Sample / Quote"], "成交":["成交","Won"], "暫停":["暫停","Paused"], "放棄":["放棄","Dropped"] };
+const LEAD_STATUS_LABEL = { "new":["leadStNew","new"], "qualified":["leadStQualified","qualified"], "promoted":["leadStPromoted","promoted"], "rejected":["leadStRejected","rejected"] };
+const leadStatusLabel = s => (LEAD_STATUS_LABEL[s] ? t(LEAD_STATUS_LABEL[s][0]) : s);
+const leadStatusTag = s => s === "promoted" ? "green" : s === "rejected" ? "grey" : s === "qualified" ? "" : "b";
+const fmtMoney = v => v == null || v === "" ? "—" : "$" + Math.round(Number(v)).toLocaleString("en-US");
+const fmtInt = v => v == null || v === "" ? "—" : Number(v).toLocaleString("en-US");
+const bandShort = b => (b || "").split(":")[0] || "—";
 
 /* ---------- 狀態 ---------- */
 let lang = localStorage.getItem("crm_lang") || "zh";
@@ -311,6 +390,10 @@ try { session = JSON.parse(localStorage.getItem("crm_session") || "null"); } cat
 let companies = [];
 let current = null;   // 目前明細公司
 let tab = "info";
+let leads = [];
+let leadsLoaded = false;
+let mainViewTab = "companies";
+let leadBusy = null;   // 正在執行晉升／拒絕的 lead id
 
 const $ = s => document.querySelector(s);
 const t = k => (I18N[lang] && I18N[lang][k]) || I18N.zh[k] || k;
@@ -343,7 +426,11 @@ const api = {
   patchCompany: (id, body) => sb("/rest/v1/crm_companies?id=eq." + encodeURIComponent(id), { method: "PATCH", headers: headers(true), body: JSON.stringify(body) }),
   list: (table, companyId) => sb("/rest/v1/" + table + "?company_id=eq." + encodeURIComponent(companyId) + "&select=*&order=created_at.desc&limit=200", { headers: headers() }),
   add: (table, body) => sb("/rest/v1/" + table, { method: "POST", headers: headers(true), body: JSON.stringify(body) }),
-  del: (table, id) => sb("/rest/v1/" + table + "?id=eq." + encodeURIComponent(id), { method: "DELETE", headers: headers(true) })
+  del: (table, id) => sb("/rest/v1/" + table + "?id=eq." + encodeURIComponent(id), { method: "DELETE", headers: headers(true) }),
+  /* 名單池：所有呼叫一律帶 headers()（GET 缺 header 會 401 並被登出，見 commit 6af06fd） */
+  leads: () => sb("/rest/v1/crm_leads?select=*&order=monthly_revenue.desc&limit=1000", { headers: headers() }),
+  addCompany: body => sb("/rest/v1/crm_companies", { method: "POST", headers: headers(true), body: JSON.stringify(body) }),
+  patchLead: (id, body) => sb("/rest/v1/crm_leads?id=eq." + encodeURIComponent(id), { method: "PATCH", headers: headers(true), body: JSON.stringify(body) })
 };
 
 /* ---------- 語言 ---------- */
@@ -353,6 +440,7 @@ function applyLang() {
   document.querySelectorAll("[data-i18n-ph]").forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
   $("#langBtn").textContent = lang === "en" ? "中文" : "EN";
   renderStats(); renderList(); renderFilterOptions();
+  renderLeadsStats(); renderLeads();
   if (current) renderDetail(current, true);
 }
 $("#langBtn").addEventListener("click", () => {
@@ -378,6 +466,8 @@ function signOut(silent) {
   session = null;
   localStorage.removeItem("crm_session");
   companies = []; current = null;
+  leads = []; leadsLoaded = false; leadBusy = null;
+  showMainTab("companies");
   closeDetail();
   showLogin();
   if (!silent) $("#msg").textContent = "";
@@ -748,6 +838,140 @@ async function delSub(kind, table, id) {
     else alert(t("delFail") + e.message);
   }
 }
+
+/* ---------- 名單池 ---------- */
+function showMainTab(which) {
+  mainViewTab = which;
+  $("#companiesView").classList.toggle("hidden", which !== "companies");
+  $("#leadsView").classList.toggle("hidden", which !== "leads");
+  $("#viewCompaniesBtn").classList.toggle("on", which === "companies");
+  $("#viewLeadsBtn").classList.toggle("on", which === "leads");
+  if (which === "leads" && !leadsLoaded) loadLeads();
+}
+$("#viewCompaniesBtn").addEventListener("click", () => showMainTab("companies"));
+$("#viewLeadsBtn").addEventListener("click", () => showMainTab("leads"));
+
+function filteredLeads() {
+  const q = $("#lq").value.trim().toLowerCase();
+  const band = $("#fBand").value, tier = $("#fTier").value, st = $("#fStatus").value;
+  return leads.filter(l =>
+    (!q || (l.brand || "").toLowerCase().includes(q)) &&
+    (!band || (l.revenue_band || "").indexOf(band) === 0) &&
+    (!tier || String(l.tier) === tier) &&
+    (!st || l.status === st));
+}
+function renderLeadsStats() {
+  const el = $("#leadsStats");
+  if (!leads.length) { el.innerHTML = ""; return; }
+  const n = f => leads.filter(f).length;
+  el.innerHTML =
+    `<div class="stat"><b>${leads.length}</b><span>${esc(t("leadStatTotal"))}</span></div>` +
+    `<div class="stat"><b>${n(l => (l.revenue_band || "").indexOf("A1") === 0)}</b><span>A1</span></div>` +
+    `<div class="stat"><b>${n(l => (l.revenue_band || "").indexOf("A2") === 0)}</b><span>A2</span></div>` +
+    `<div class="stat"><b>${n(l => l.status === "new")}</b><span>${esc(t("leadStatNew"))}</span></div>` +
+    `<div class="stat"><b>${n(l => l.status === "promoted")}</b><span>${esc(t("leadStatPromoted"))}</span></div>`;
+}
+function renderLeads() {
+  const list = filteredLeads();
+  $("#leadsMeta").textContent = t("leadShowing").replace("{n}", leads.length).replace("{m}", list.length);
+  const box = $("#leadsList");
+  box.innerHTML = "";
+  $("#leadsEmpty").classList.toggle("hidden", list.length > 0);
+  list.slice(0, 200).forEach(l => {
+    const d = document.createElement("div");
+    d.className = "lrow";
+    const busy = leadBusy === l.id;
+    const done = l.status === "promoted" || l.status === "rejected";
+    d.innerHTML =
+      `<span><span class="nm">${esc(l.brand || t("untitled"))}</span>${l.domain ? `<br><span class="dm">${esc(l.domain)}</span>` : ""}</span>` +
+      `<span class="num" data-l="${esc(t("colRevenue"))}">${esc(fmtMoney(l.monthly_revenue))}</span>` +
+      `<span class="num" data-l="${esc(t("colSales"))}">${esc(fmtInt(l.monthly_sales))}</span>` +
+      `<span data-l="${esc(t("colBand"))}"><span class="tag b">${esc(bandShort(l.revenue_band))}</span></span>` +
+      `<span data-l="${esc(t("colTier"))}">${esc(l.tier == null ? "—" : l.tier)}</span>` +
+      `<span data-l="${esc(t("colStatus"))}"><span class="tag ${leadStatusTag(l.status)}">${esc(leadStatusLabel(l.status))}</span></span>` +
+      `<span class="acts">` +
+        `<button type="button" class="btn small" data-promote="${esc(l.id)}" ${done || busy ? "disabled" : ""}>${esc(t("leadPromote"))}</button>` +
+        `<button type="button" class="btn ghost small" data-reject="${esc(l.id)}" ${done || busy ? "disabled" : ""}>${esc(t("leadReject"))}</button>` +
+      `</span>`;
+    d.querySelector("[data-promote]").addEventListener("click", () => promoteLead(l));
+    d.querySelector("[data-reject]").addEventListener("click", () => rejectLead(l));
+    box.appendChild(d);
+  });
+  if (list.length > 200) {
+    const more = document.createElement("div");
+    more.className = "empty";
+    more.textContent = "… +" + (list.length - 200);
+    box.appendChild(more);
+  }
+}
+function setLeadsMsg(text, kind) {
+  const el = $("#leadsMsg");
+  el.textContent = text;
+  el.className = kind === "ok" ? "ok" : kind === "muted" ? "muted" : "err";
+}
+async function loadLeads() {
+  setLeadsMsg(t("loading"), "muted");
+  try {
+    leads = await api.leads();
+    leadsLoaded = true;
+    setLeadsMsg("", "muted");
+    renderLeadsStats(); renderLeads();
+  } catch (e) {
+    setLeadsMsg(t("loadFail") + e.message, "err");
+  }
+}
+async function promoteLead(lead) {
+  /* crm_companies.domain 為 NOT NULL UNIQUE：沒有網域的名單無法晉升，擋下並明說，不亂填佔位值 */
+  if (!lead.domain) { setLeadsMsg(t("leadNoDomain"), "err"); return; }
+  if (!confirm(t("leadPromoteConfirm").replace("{b}", lead.brand))) return;
+  leadBusy = lead.id;
+  renderLeads();
+  try {
+    const body = { id: lead.id, name: lead.brand, domain: lead.domain, market: "未查核", factory: "未知", stage: "研究中", priority: "B", source: lead.source };
+    const created = await api.addCompany(body);
+    const row = Array.isArray(created) ? created[0] : created;
+    if (row) { companies.push(row); renderStats(); renderList(); }
+    try {
+      await api.patchLead(lead.id, { status: "promoted", matched_company_id: lead.id });
+    } catch (e2) {
+      /* 品牌已建立、名單狀態未更新：不把本地狀態寫成已晉升（以 DB 為準），請使用者在 Supabase 手動補狀態 */
+      setLeadsMsg(t("leadPromotedPartial") + e2.message, "err");
+      return;
+    }
+    lead.status = "promoted"; lead.matched_company_id = lead.id;
+    renderLeadsStats(); renderLeads();
+    setLeadsMsg(t("leadPromoted"), "ok");
+  } catch (e) {
+    setLeadsMsg(t("leadActionFail") + e.message, "err");
+  } finally {
+    leadBusy = null;
+    renderLeads();
+  }
+}
+async function rejectLead(lead) {
+  if (!confirm(t("leadRejectConfirm").replace("{b}", lead.brand))) return;
+  leadBusy = lead.id;
+  renderLeads();
+  try {
+    await api.patchLead(lead.id, { status: "rejected" });
+    lead.status = "rejected";
+    renderLeadsStats(); renderLeads();
+    setLeadsMsg(t("leadRejected"), "ok");
+  } catch (e) {
+    setLeadsMsg(t("leadActionFail") + e.message, "err");
+  } finally {
+    leadBusy = null;
+    renderLeads();
+  }
+}
+["lq","fBand","fTier","fStatus"].forEach(id => {
+  $("#" + id).addEventListener("input", renderLeads);
+  $("#" + id).addEventListener("change", renderLeads);
+});
+$("#lResetBtn").addEventListener("click", () => {
+  $("#lq").value = ""; $("#fBand").value = ""; $("#fTier").value = ""; $("#fStatus").value = "";
+  renderLeads();
+});
 
 /* ---------- 啟動 ---------- */
 applyLang();
