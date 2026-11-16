@@ -89,8 +89,6 @@ a{color:var(--accent)}
 /* 配方區標題列：標題＋匯出按鈕同列，手機寬度按鈕自動換行 */
 .fxhead{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:14px 0 8px}
 .fxhead h3{flex:1;margin:0}
-.cmpwrap{overflow-x:auto}
-.cmpwrap .fx{min-width:560px}
 /* 主畫面分頁（品牌主檔／名單池） */
 .viewtabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
 .viewtabs button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 18px;font-weight:700}
@@ -183,7 +181,6 @@ a{color:var(--accent)}
       <button id="viewDashboardBtn" type="button" class="on" data-i18n="tabDashboard">儀表板</button>
       <button id="viewCompaniesBtn" type="button" data-i18n="tabCompanies">品牌主檔</button>
       <button id="viewLeadsBtn" type="button" data-i18n="tabLeads">名單池</button>
-      <button id="viewCompareBtn" type="button" data-i18n="tabCompare">配方對比</button>
     </div>
     <div id="dashboardView">
       <div class="card"><div id="dashStats" class="stats"></div></div>
@@ -259,22 +256,6 @@ a{color:var(--accent)}
         <div id="leadsEmpty" class="empty hidden" data-i18n="leadNoResult">沒有符合的名單。</div>
       </div>
       <p id="leadsMsg" class="err"></p>
-    </div>
-    <!-- 配方對比 -->
-    <div id="compareView" class="hidden">
-      <div class="card">
-        <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap">
-          <b data-i18n="cmpTitle">配方對比</b>
-          <span style="display:flex;gap:8px;flex-wrap:wrap">
-            <button id="cmpBtn" class="btn small" type="button" data-i18n="cmpCompare">對比</button>
-            <button id="cmpExportBtn" class="btn ghost small" type="button" data-i18n="exportXlsx">匯出 Excel</button>
-          </span>
-        </div>
-        <p class="muted" data-i18n="cmpHint">勾選 2–4 個產品，按「對比」產生對比表。</p>
-        <div id="cmpList"><span class="muted">載入中…</span></div>
-        <p id="cmpMsg" class="err"></p>
-      </div>
-      <div class="card hidden" id="cmpResultCard"><div id="cmpResult"></div></div>
     </div>
   </section>
   <p id="msg" class="err"></p>
@@ -440,11 +421,7 @@ const I18N = {
     signalTypeFounder:"創辦人發文", signalTypeCommunity:"社群回饋", signalTypeLaunch:"上線貼文", signalTypeDemand:"需求提及", signalTypeCompetitor:"競品提及",
     signalSubreddit:"版面", signalAuthor:"作者", signalUpvotes:"讚數", signalComments:"留言", signalSentiment:"情緒",
     sentimentPositive:"正面", sentimentNeutral:"中性", sentimentNegative:"負面", sentimentMixed:"褒貶不一",
-    tabCompare:"配方對比", cmpTitle:"配方對比", cmpHint:"勾選 2–4 個產品，按「對比」產生對比表。",
-    cmpCompare:"對比", cmpMin:"請至少勾選 2 個產品。", cmpMax:"最多勾選 4 個產品。",
-    cmpLoadFail:"產品載入失敗：", cmpEmpty:"尚無產品資料。",
-    cmpNutrients:"營養素對比", cmpOverlap:"成分重疊", cmpCommon:"共有成分", cmpUnique:"獨有成分",
-    cmpNoNutrients:"無營養素數據（專有混合配方）", cmpProduct:"產品", cmpBrand:"品牌",
+    cmpProduct:"產品",
     exportXlsx:"匯出 Excel", exporting:"匯出中…", exportFail:"匯出失敗：", exportNoData:"沒有可匯出的配方資料。",
     sheetProducts:"產品總表", formulaColCategory:"類別", formulaColSource:"來源",
     formulaColAmountValue:"含量", formulaColUnit:"單位", formulaColStore:"Amazon Store"
@@ -540,11 +517,7 @@ const I18N = {
     signalTypeFounder:"Founder post", signalTypeCommunity:"Community feedback", signalTypeLaunch:"Launch post", signalTypeDemand:"Demand mention", signalTypeCompetitor:"Competitor mention",
     signalSubreddit:"Subreddit", signalAuthor:"Author", signalUpvotes:"Upvotes", signalComments:"Comments", signalSentiment:"Sentiment",
     sentimentPositive:"Positive", sentimentNeutral:"Neutral", sentimentNegative:"Negative", sentimentMixed:"Mixed",
-    tabCompare:"Formula compare", cmpTitle:"Formula compare", cmpHint:"Select 2–4 products, then press Compare.",
-    cmpCompare:"Compare", cmpMin:"Select at least 2 products.", cmpMax:"Select at most 4 products.",
-    cmpLoadFail:"Failed to load products: ", cmpEmpty:"No products yet.",
-    cmpNutrients:"Nutrient comparison", cmpOverlap:"Ingredient overlap", cmpCommon:"Shared ingredients", cmpUnique:"Unique ingredients",
-    cmpNoNutrients:"No nutrition data (proprietary blend)", cmpProduct:"Product", cmpBrand:"Brand",
+    cmpProduct:"Product",
     exportXlsx:"Export Excel", exporting:"Exporting…", exportFail:"Export failed: ", exportNoData:"No formula data to export.",
     sheetProducts:"Products", formulaColCategory:"Category", formulaColSource:"Source",
     formulaColAmountValue:"Amount", formulaColUnit:"Unit", formulaColStore:"Amazon Store"
@@ -686,9 +659,6 @@ const api = {
   reviewsByBrand: brandId => sb("/rest/v1/crm_reviews?brand_id=eq." + encodeURIComponent(brandId) + "&select=*&order=observed_at.desc,created_at.desc&limit=200", { headers: headers() }),
   /* Reddit 訊號（crm_signals） */
   signalsByBrand: brandId => sb("/rest/v1/crm_signals?brand_id=eq." + encodeURIComponent(brandId) + "&select=*&order=observed_at.desc,created_at.desc&limit=200", { headers: headers() }),
-  /* 配方對比：全部產品＋多產品成分 */
-  productsAll: () => sb("/rest/v1/crm_products?select=*&order=brand_id.asc,created_at.asc&limit=100", { headers: headers() }),
-  ingredientsByProductIds: ids => sb("/rest/v1/crm_formula_ingredients?product_id=in.(" + ids.map(encodeURIComponent).join(",") + ")&select=*&order=sort_order.asc,created_at.asc&limit=1000", { headers: headers() })
 };
 
 /* ---------- 語言 ---------- */
@@ -702,7 +672,6 @@ function applyLang() {
   if (current) renderDetail(current, true);
   if (currentLead) openLeadDetail(currentLead);
   if (mainViewTab === "dashboard") renderDashboard();
-  if (mainViewTab === "compare") renderCompare();
   syncStickyTop();
 }
 $("#langBtn").addEventListener("click", () => {
@@ -1184,19 +1153,15 @@ function showMainTab(which) {
   $("#dashboardView").classList.toggle("hidden", which !== "dashboard");
   $("#companiesView").classList.toggle("hidden", which !== "companies");
   $("#leadsView").classList.toggle("hidden", which !== "leads");
-  $("#compareView").classList.toggle("hidden", which !== "compare");
   $("#viewDashboardBtn").classList.toggle("on", which === "dashboard");
   $("#viewCompaniesBtn").classList.toggle("on", which === "companies");
   $("#viewLeadsBtn").classList.toggle("on", which === "leads");
-  $("#viewCompareBtn").classList.toggle("on", which === "compare");
   if (which === "leads" && !leadsLoaded) loadLeads();
   if (which === "dashboard") renderDashboard();
-  if (which === "compare") loadCompare();
 }
 $("#viewCompaniesBtn").addEventListener("click", () => showMainTab("companies"));
 $("#viewLeadsBtn").addEventListener("click", () => showMainTab("leads"));
 $("#viewDashboardBtn").addEventListener("click", () => showMainTab("dashboard"));
-$("#viewCompareBtn").addEventListener("click", () => showMainTab("compare"));
 $("#dashGoCompanies").addEventListener("click", () => showMainTab("companies"));
 $("#dashGoLeads").addEventListener("click", () => showMainTab("leads"));
 $("#dashRefresh").addEventListener("click", () => { dashCache = null; renderDashboard(); });
@@ -1309,131 +1274,6 @@ $("#dashRecent").addEventListener("click", e => {
   if (it) openBrandById(it.dataset.brand);
 });
 
-/* ---------- 配方對比 ---------- */
-let compareProducts = null;   // 全部產品（快取）
-let compareSelected = [];     // 勾選的產品 id（依勾選順序）
-let compareShown = false;
-let compareIngCache = null;   // {key, rows}：成分快取（語言切換時重繪不用重抓）
-async function loadCompare() {
-  const box = $("#cmpList");
-  if (compareProducts) { renderCompareList(); return; }
-  box.innerHTML = `<span class="muted">${esc(t("loading"))}</span>`;
-  if (!leadsLoaded) { try { await loadLeads(); } catch (e) { /* 名單載入失敗不擋對比，品牌名退回 id */ } }
-  try {
-    compareProducts = await api.productsAll();
-    renderCompareList();
-  } catch (e) {
-    box.innerHTML = `<span class="err">${esc(t("cmpLoadFail"))}${esc(e.message)}</span>`;
-  }
-}
-function renderCompareList() {
-  const box = $("#cmpList");
-  const rows = Array.isArray(compareProducts) ? compareProducts : [];
-  if (!rows.length) { box.innerHTML = `<div class="muted">${esc(t("cmpEmpty"))}</div>`; return; }
-  box.innerHTML = rows.map(p => {
-    const checked = compareSelected.includes(p.id) ? " checked" : "";
-    const bname = brandNameById(p.brand_id);
-    return `<label class="subitem" style="display:block;cursor:pointer"><input type="checkbox" data-cmp="${esc(p.id)}"${checked} style="width:auto"> <b>${esc(p.product_name || t("untitled"))}</b> · ${esc(bname)}${p.asin ? " · ASIN " + esc(p.asin) : ""}${p.form ? " · " + esc(p.form) : ""}</label>`;
-  }).join("");
-  box.querySelectorAll("[data-cmp]").forEach(cb => cb.addEventListener("change", () => {
-    const id = cb.dataset.cmp;
-    if (cb.checked) { if (!compareSelected.includes(id)) compareSelected.push(id); }
-    else compareSelected = compareSelected.filter(x => x !== id);
-    $("#cmpMsg").textContent = "";
-    $("#cmpResultCard").classList.add("hidden");
-    compareShown = false;
-  }));
-}
-function renderCompare() {   // 語言切換時重繪（不重抓產品；成分用快取）
-  if (compareProducts) renderCompareList();
-  if (compareShown) runCompare();
-}
-/* 對比共用資料：營養素名聯集（首次出現順序）＋成分交集／獨有（畫面與 Excel 匯出共用） */
-function compareData(sel, rows) {
-  const byProduct = {};
-  sel.forEach(p => { byProduct[p.id] = rows.filter(r => r.product_id === p.id); });
-  const norm = s => (s || "").trim().toLowerCase();
-  const nfNames = [];
-  const nfSeen = new Set();
-  sel.forEach(p => byProduct[p.id].filter(r => r.source === "nutrition_facts").forEach(r => {
-    const k = norm(r.ingredient_name);
-    if (k && !nfSeen.has(k)) { nfSeen.add(k); nfNames.push(r.ingredient_name); }
-  }));
-  const ilSets = sel.map(p => {
-    const s = new Set();
-    byProduct[p.id].filter(r => r.source !== "nutrition_facts").forEach(r => { if (norm(r.ingredient_name)) s.add(norm(r.ingredient_name)); });
-    return s;
-  });
-  const displayName = k => {
-    for (const p of sel) {
-      const r = byProduct[p.id].find(x => norm(x.ingredient_name) === k);
-      if (r) return r.ingredient_name;
-    }
-    return k;
-  };
-  const common = ilSets.length ? [...ilSets[0]].filter(k => ilSets.every(s => s.has(k))) : [];
-  const uniqueFor = i => [...ilSets[i]].filter(k => !ilSets.some((s, j) => j !== i && s.has(k)));
-  return { byProduct, norm, nfNames, ilSets, displayName, common, uniqueFor };
-}
-function compareHtml(sel, rows) {
-  const d = compareData(sel, rows);
-  const { byProduct, norm, nfNames, displayName, common, uniqueFor } = d;
-  /* (a) 營養素矩陣：各產品 nutrition_facts 成分名聯集（依首次出現順序） */
-  let h = `<h3>${esc(t("cmpNutrients"))}</h3>`;
-  const nfMissing = sel.filter(p => !byProduct[p.id].some(r => r.source === "nutrition_facts"));
-  if (nfMissing.length) {
-    h += `<div class="muted">${esc(nfMissing.map(p => p.product_name || p.id).join("、"))}：${esc(t("cmpNoNutrients"))}</div>`;
-  }
-  if (!nfNames.length) {
-    h += `<div class="muted">${esc(t("cmpNoNutrients"))}</div>`;
-  } else {
-    h += `<div class="cmpwrap"><table class="fx"><thead><tr><th>${esc(t("formulaColIngredient"))}</th>${sel.map(p => `<th class="num">${esc(p.product_name || p.id)}</th>`).join("")}</tr></thead><tbody>`;
-    nfNames.forEach(name => {
-      h += `<tr><td>${esc(name)}</td>`;
-      sel.forEach(p => {
-        const r = byProduct[p.id].find(x => x.source === "nutrition_facts" && norm(x.ingredient_name) === norm(name));
-        h += `<td class="num">${r ? esc(fmtAmount(r.amount_value, r.amount_unit)) + (r.dv_pct == null ? "" : " (" + esc(r.dv_pct) + "%)") : "—"}</td>`;
-      });
-      h += `</tr>`;
-    });
-    h += `</tbody></table></div>`;
-  }
-  /* (b) 成分重疊：ingredients_list 交集與各產品獨有 */
-  h += `<h3 style="margin-top:14px">${esc(t("cmpOverlap"))}</h3>`;
-  h += `<div><b>${esc(t("cmpCommon"))}</b>：${common.length ? common.map(displayName).map(esc).join(" · ") : "—"}</div>`;
-  sel.forEach((p, i) => {
-    const unique = uniqueFor(i);
-    h += `<div><b>${esc(p.product_name || p.id)}</b> ${esc(t("cmpUnique"))}：${unique.length ? unique.map(displayName).map(esc).join(" · ") : "—"}</div>`;
-  });
-  return h;
-}
-async function runCompare() {
-  const msg = $("#cmpMsg");
-  const card = $("#cmpResultCard"), out = $("#cmpResult");
-  if (compareSelected.length < 2) { msg.textContent = t("cmpMin"); msg.className = "err"; return; }
-  if (compareSelected.length > 4) { msg.textContent = t("cmpMax"); msg.className = "err"; return; }
-  msg.textContent = "";
-  const sel = compareProducts.filter(p => compareSelected.includes(p.id));
-  sel.sort((a, b) => compareSelected.indexOf(a.id) - compareSelected.indexOf(b.id));
-  out.innerHTML = `<span class="muted">${esc(t("loading"))}</span>`;
-  card.classList.remove("hidden");
-  compareShown = true;
-  const key = compareSelected.join(",");
-  let ings;
-  if (compareIngCache && compareIngCache.key === key) {
-    ings = compareIngCache.rows;
-  } else {
-    try {
-      ings = await api.ingredientsByProductIds(compareSelected);
-      compareIngCache = { key, rows: ings };
-    } catch (e) {
-      out.innerHTML = `<span class="err">${esc(t("loadFail"))}${esc(e.message)}</span>`;
-      return;
-    }
-  }
-  out.innerHTML = compareHtml(sel, Array.isArray(ings) ? ings : []);
-}
-$("#cmpBtn").addEventListener("click", () => runCompare());
 
 function filteredLeads() {
   const q = $("#lq").value.trim().toLowerCase();
@@ -1998,13 +1838,6 @@ function xlsxToday() {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 const xlsxSafeName = s => String(s || "").replace(/[\\\/:*?"<>|]/g, "-").trim() || "brand";
-/* 品牌 Store 連結（主檔／名單任一邊找得到就用） */
-function brandStoreUrl(brandId) {
-  const c = companies.find(x => x.id === brandId);
-  if (c && c.amazon_store_url) return c.amazon_store_url;
-  const l = leads.find(x => x.id === brandId);
-  return (l && l.amazon_store_url) || "";
-}
 /* 產品總表：每產品一行；storeUrl 可為字串（全表同一家）或函式（逐產品取品牌 Store） */
 function productsOverviewRows(products, storeUrl) {
   const rows = [[t("cmpProduct"), "ASIN", t("format"), t("formulaServing"), t("formulaServings"), t("formulaFlavors"), t("formulaClaims"), t("formulaCalories"), t("formulaColStore")]];
@@ -2057,45 +1890,6 @@ async function exportBrandFormulas(brand, btn, sectionEl) {
     }
   } finally { setBusy(false); }
 }
-/* (b) 配方對比匯出：產品總表＋營養素矩陣＋成分重疊 */
-async function exportCompareXlsx() {
-  const msg = $("#cmpMsg"), btn = $("#cmpExportBtn");
-  msg.textContent = "";
-  if (compareSelected.length < 2) { msg.textContent = t("cmpMin"); return; }
-  if (compareSelected.length > 4) { msg.textContent = t("cmpMax"); return; }
-  btn.disabled = true;
-  btn.textContent = t("exporting");
-  try {
-    const sel = compareProducts.filter(p => compareSelected.includes(p.id));
-    sel.sort((a, b) => compareSelected.indexOf(a.id) - compareSelected.indexOf(b.id));
-    const key = compareSelected.join(",");
-    let ings;
-    if (compareIngCache && compareIngCache.key === key) ings = compareIngCache.rows;
-    else { ings = await api.ingredientsByProductIds(compareSelected); compareIngCache = { key, rows: ings }; }
-    const d = compareData(sel, Array.isArray(ings) ? ings : []);
-    const used = new Set();
-    const sheets = [{ name: xlsxSheetName(t("sheetProducts"), used), rows: productsOverviewRows(sel, p => brandStoreUrl(p.brand_id)) }];
-    const mRows = [[t("formulaColIngredient"), ...sel.map(p => p.product_name || p.id)]];
-    d.nfNames.forEach(name => {
-      mRows.push([name, ...sel.map(p => {
-        const r = d.byProduct[p.id].find(x => x.source === "nutrition_facts" && d.norm(x.ingredient_name) === d.norm(name));
-        return r ? fmtAmount(r.amount_value, r.amount_unit) + (r.dv_pct == null ? "" : " (" + r.dv_pct + "%)") : "—";
-      })]);
-    });
-    sheets.push({ name: xlsxSheetName(t("cmpNutrients"), used), rows: mRows });
-    const oRows = [[t("formulaColCategory"), t("formulaColIngredient")]];
-    d.common.forEach(k => oRows.push([t("cmpCommon"), d.displayName(k)]));
-    sel.forEach((p, i) => d.uniqueFor(i).forEach(k => oRows.push([(p.product_name || p.id) + " " + t("cmpUnique"), d.displayName(k)])));
-    sheets.push({ name: xlsxSheetName(t("cmpOverlap"), used), rows: oRows });
-    xlsxDownload(xlsxBuildBook(sheets), `配方對比-${xlsxToday()}.xlsx`);
-  } catch (e) {
-    msg.textContent = t("exportFail") + e.message;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = t("exportXlsx");
-  }
-}
-$("#cmpExportBtn").addEventListener("click", () => exportCompareXlsx());
 /* ---------- 評價訊息池（crm_reviews） ---------- */
 function reviewSourceLabel(s) {
   return s === "judge.me" ? "Judge.me"
