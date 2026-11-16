@@ -49,6 +49,8 @@ a{color:var(--accent)}
 .row.head{font-size:12px;color:var(--muted);cursor:default;background:none;font-weight:700}
 /* 欄位名稱列：瀏覽時懸浮固定在頂欄下方 */
 .row.head{position:sticky;top:var(--stickyTop,56px);z-index:10;background:var(--card);border-bottom:2px solid var(--line);box-shadow:0 1px 0 var(--line)}
+.imp{display:grid;grid-template-columns:2fr 1.4fr .8fr 1.2fr;gap:6px;padding:8px;border-top:1px solid var(--line);align-items:center}
+.imp.head{font-size:12px;color:var(--muted);font-weight:700;border-top:0}
 /* 翻頁列 */
 .pager{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:14px 8px 6px}
 .pager .pg{min-width:34px;padding:6px 10px;border:1px solid var(--line);background:#fff;border-radius:8px}
@@ -206,6 +208,25 @@ a{color:var(--accent)}
           <div><button id="lResetBtn" class="btn ghost" type="button" data-i18n="reset">重設</button></div>
         </div>
       </div>
+      <div class="card">
+        <div style="display:flex;gap:8px;align-items:center;justify-content:space-between">
+          <b data-i18n="importTitle">匯入名單</b>
+          <button id="importToggleBtn" class="btn ghost small" type="button" data-i18n="importToggle">貼上文字匯入</button>
+        </div>
+        <div id="importPanel" class="hidden" style="margin-top:10px">
+          <label class="muted" data-i18n="importHint">每行一家，格式：品牌名稱（可加網域，例如：NOHO Drink nohodrink.com）。貼上後先解析、比對，確認再匯入。</label>
+          <textarea id="importText" rows="6" style="margin-top:6px" data-i18n-ph="importTextPh" placeholder="NOHO Drink nohodrink.com&#10;Sly&#10;REVYVE"></textarea>
+          <div class="editgrid" style="margin-top:8px">
+            <div class="full"><label class="muted" data-i18n="importSource">資料來源</label><input id="importSource" type="text" data-i18n-ph="importSourcePh" placeholder="例如 apollo-more-labs-similar-2026-11-15"></div>
+          </div>
+          <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button id="importParseBtn" class="btn small" type="button" data-i18n="importParse">解析比對</button>
+            <button id="importBtn" class="btn small hidden" type="button" data-i18n="importDo">匯入新增</button>
+            <span id="importMsg" class="err"></span>
+          </div>
+          <div id="importPreview" style="margin-top:10px"></div>
+        </div>
+      </div>
       <div class="card" style="padding-top:4px">
         <div id="leadsMeta" class="muted" style="padding:10px 8px 0"></div>
         <div class="lrow head"><span data-i18n="colBrand">品牌</span><span data-i18n="colRevenue">月營收</span><span data-i18n="colSales">月銷量</span><span data-i18n="colBand">級距</span><span data-i18n="colTier">級別</span><span data-i18n="colStatus">狀態</span><span data-i18n="colActions">操作</span></div>
@@ -316,7 +337,18 @@ const I18N = {
     noPhone:"—", untitled:"（未命名）",
     tabCompanies:"品牌主檔", tabLeads:"名單池",
     leadBand:"營收級距", leadTier:"級別", leadStatus:"狀態", leadSearchPh:"品牌名稱…",
-    colRevenue:"月營收", colSales:"月銷量", colBand:"級距", colTier:"級別", colStatus:"狀態", colActions:"操作",
+    colRevenue:"月營收", colSales:"月銷量", colBand:"級距", colTier:"級別", colStatus:"狀態", colActions:"操作", colNote:"備註",
+    importTitle:"匯入名單", importToggle:"貼上文字匯入",
+    importHint:"每行一家，格式：品牌名稱（可加網域，例如：NOHO Drink nohodrink.com）。貼上後先解析、比對，確認再匯入。",
+    importTextPh:"NOHO Drink nohodrink.com\nSly\nREVYVE",
+    importSource:"資料來源", importSourcePh:"例如 apollo-more-labs-similar-2026-11-15",
+    importParse:"解析比對", importDo:"匯入新增",
+    importNeedSource:"請先填資料來源。", importNeedText:"請先貼上名單文字。",
+    importParsed:"解析 {n} 家：新增 {a} 家、重複 {d} 家、待確認 {r} 家。",
+    importDone:"已匯入 {n} 家。", importFail:"匯入失敗：",
+    importStNew:"新增", importStDup:"重複", importStReview:"待確認",
+    importDupReason:"已在{where}", importWhereCompanies:"品牌主檔", importWhereLeads:"名單池",
+    importReviewReason:"名稱相似，請人工確認",
     leadStNew:"新名單", leadStQualified:"已篩選", leadStPromoted:"已晉升", leadStRejected:"已拒絕",
     leadPromote:"晉升", leadReject:"拒絕",
     leadPromoteConfirm:"確定將「{b}」晉升到品牌主檔？", leadRejectConfirm:"確定拒絕「{b}」？",
@@ -364,7 +396,18 @@ const I18N = {
     noPhone:"—", untitled:"(untitled)",
     tabCompanies:"Companies", tabLeads:"Leads",
     leadBand:"Revenue band", leadTier:"Tier", leadStatus:"Status", leadSearchPh:"Brand name…",
-    colRevenue:"Monthly revenue", colSales:"Monthly sales", colBand:"Band", colTier:"Tier", colStatus:"Status", colActions:"Actions",
+    colRevenue:"Monthly revenue", colSales:"Monthly sales", colBand:"Band", colTier:"Tier", colStatus:"Status", colActions:"Actions", colNote:"Note",
+    importTitle:"Import leads", importToggle:"Paste text to import",
+    importHint:"One company per line: brand name, optionally followed by a domain (e.g. NOHO Drink nohodrink.com). Parse and dedupe first, then confirm the import.",
+    importTextPh:"NOHO Drink nohodrink.com\nSly\nREVYVE",
+    importSource:"Source", importSourcePh:"e.g. apollo-more-labs-similar-2026-11-15",
+    importParse:"Parse & check", importDo:"Import new",
+    importNeedSource:"Please enter a source first.", importNeedText:"Please paste the lead list first.",
+    importParsed:"Parsed {n}: {a} new, {d} duplicates, {r} to review.",
+    importDone:"Imported {n} leads.", importFail:"Import failed: ",
+    importStNew:"New", importStDup:"Duplicate", importStReview:"Review",
+    importDupReason:"Already in {where}", importWhereCompanies:"companies", importWhereLeads:"leads pool",
+    importReviewReason:"Similar name, please check",
     leadStNew:"New", leadStQualified:"Qualified", leadStPromoted:"Promoted", leadStRejected:"Rejected",
     leadPromote:"Promote", leadReject:"Reject",
     leadPromoteConfirm:"Promote “{b}” to the companies list?", leadRejectConfirm:"Reject “{b}”?",
@@ -485,6 +528,7 @@ const api = {
   /* 名單池：所有呼叫一律帶 headers()（GET 缺 header 會 401 並被登出，見 commit 6af06fd） */
   leads: () => sb("/rest/v1/crm_leads?select=*&order=monthly_revenue.desc&limit=1000", { headers: headers() }),
   addCompany: body => sb("/rest/v1/crm_companies", { method: "POST", headers: headers(true), body: JSON.stringify(body) }),
+  addLeadsBulk: body => sb("/rest/v1/crm_leads", { method: "POST", headers: headers(true), body: JSON.stringify(body) }),
   patchLead: (id, body) => sb("/rest/v1/crm_leads?id=eq." + encodeURIComponent(id), { method: "PATCH", headers: headers(true), body: JSON.stringify(body) }),
   researchRequests: leadId => sb("/rest/v1/crm_research_requests?lead_id=eq." + encodeURIComponent(leadId) + "&select=*&order=requested_at.desc&limit=5", { headers: headers() }),
   addResearchRequest: body => sb("/rest/v1/crm_research_requests", { method: "POST", headers: headers(true), body: JSON.stringify(body) })
@@ -1240,6 +1284,117 @@ async function requestLeadResearch() {
   }
 }
 $("#ldResearchBtn").addEventListener("click", requestLeadResearch);
+
+/* ---------- 名單匯入（貼文字） ---------- */
+let importParsed = [];
+const normBrand = s => (s || "").toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, " ").replace(/\b(llc|inc|corp|co|ltd|the|company)\b/g, " ").replace(/\s+/g, " ").trim();
+function importSlug(norm) {
+  const s = norm.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return s || "unnamed";
+}
+function parseImportLine(line) {
+  let s = line.trim();
+  if (!s) return null;
+  let domain = null;
+  const urlM = s.match(/https?:\/\/([a-z0-9.-]+\.[a-z]{2,})/i);
+  if (urlM) { domain = urlM[1].replace(/^www\./i, "").toLowerCase(); s = s.replace(/https?:\/\/\S+/i, " ").trim(); }
+  if (!domain) {
+    const tokM = s.match(/(?:^|[\s,;|])((?:www\.)?[a-z0-9-]+\.[a-z]{2,}(?:\.[a-z]{2,})?)\s*$/i);
+    if (tokM) { domain = tokM[1].replace(/^www\./i, "").toLowerCase(); s = s.slice(0, tokM.index).trim().replace(/[\s,;|]+$/, ""); }
+  }
+  if (!domain && s.includes(",")) {
+    const parts = s.split(",");
+    const last = parts[parts.length - 1].trim();
+    if (/^[a-z0-9-]+\.[a-z]{2,}$/i.test(last)) { domain = last.toLowerCase(); s = parts.slice(0, -1).join(",").trim(); }
+  }
+  const brand = s.replace(/^["']|["']$/g, "").trim();
+  if (!brand) return null;
+  return { brand, domain };
+}
+function importDedupe(p) {
+  const norm = normBrand(p.brand);
+  const dom = (p.domain || "").toLowerCase();
+  if ((dom && companies.some(c => (c.domain || "").toLowerCase() === dom)) || (norm && companies.some(c => normBrand(c.name) === norm)))
+    return { status: "dup", where: t("importWhereCompanies") };
+  if ((dom && leads.some(l => (l.domain || "").toLowerCase() === dom)) || (norm && leads.some(l => normBrand(l.brand) === norm)))
+    return { status: "dup", where: t("importWhereLeads") };
+  const similar = [...companies, ...leads].find(x => {
+    const n2 = normBrand(x.name || x.brand);
+    return norm.length >= 4 && n2.length >= 4 && norm !== n2 && (n2.includes(norm) || norm.includes(n2));
+  });
+  if (similar) return { status: "review", where: "" };
+  return { status: "new", where: "" };
+}
+function renderImportPreview() {
+  const el = $("#importPreview");
+  if (!importParsed.length) { el.innerHTML = ""; return; }
+  const domLabel = LEAD_FIELD_LABEL.domain[lang === "en" ? 1 : 0];
+  el.innerHTML = `<div class="imp head"><span>${esc(t("colBrand"))}</span><span>${esc(domLabel)}</span><span>${esc(t("colStatus"))}</span><span>${esc(t("colNote"))}</span></div>` +
+    importParsed.map(r => {
+      const tag = r.status === "new" ? "green" : r.status === "dup" ? "grey" : "b";
+      const label = t(r.status === "new" ? "importStNew" : r.status === "dup" ? "importStDup" : "importStReview");
+      const note = r.status === "dup" ? t("importDupReason").replace("{where}", r.where) : r.status === "review" ? t("importReviewReason") : "";
+      return `<div class="imp"><span><span class="nm">${esc(r.brand)}</span></span><span>${r.domain ? domainLink(r.domain) : "—"}</span><span><span class="tag ${tag}">${esc(label)}</span></span><span class="muted">${esc(note)}</span></div>`;
+    }).join("");
+}
+$("#importToggleBtn").addEventListener("click", () => $("#importPanel").classList.toggle("hidden"));
+$("#importParseBtn").addEventListener("click", () => {
+  const msg = $("#importMsg");
+  const src = $("#importSource").value.trim();
+  if (!src) { msg.textContent = t("importNeedSource"); msg.className = "err"; return; }
+  const text = $("#importText").value;
+  if (!text.trim()) { msg.textContent = t("importNeedText"); msg.className = "err"; return; }
+  const rows = [];
+  const seen = new Set();
+  text.split(/\n/).forEach(line => {
+    const p = parseImportLine(line);
+    if (!p) return;
+    const key = normBrand(p.brand) + "|" + (p.domain || "");
+    if (seen.has(key)) return;
+    seen.add(key);
+    rows.push({ ...p, ...importDedupe(p) });
+  });
+  importParsed = rows;
+  renderImportPreview();
+  const n = rows.length, a = rows.filter(r => r.status === "new").length,
+    d = rows.filter(r => r.status === "dup").length, r = rows.filter(r => r.status === "review").length;
+  msg.textContent = t("importParsed").replace("{n}", n).replace("{a}", a).replace("{d}", d).replace("{r}", r);
+  msg.className = "ok";
+  $("#importBtn").classList.toggle("hidden", a === 0);
+});
+$("#importBtn").addEventListener("click", async () => {
+  const msg = $("#importMsg");
+  const src = $("#importSource").value.trim();
+  const news = importParsed.filter(r => r.status === "new");
+  if (!news.length || !src) return;
+  const btn = $("#importBtn");
+  btn.disabled = true;
+  const usedIds = new Set(leads.map(l => l.id));
+  const body = news.map(r => {
+    let base = "imp-" + importSlug(normBrand(r.brand));
+    let id = base, n = 2;
+    while (usedIds.has(id)) { id = base + "-" + n; n++; }
+    usedIds.add(id);
+    return { id, brand: r.brand, domain: r.domain || null, source: src, source_id: null, date_sc: null, monthly_sales: null, monthly_revenue: null, revenue_band: null, tier: null, dedupe_status: "new", matched_company_id: null, status: "new" };
+  });
+  try {
+    const rows = await api.addLeadsBulk(body);
+    const added = Array.isArray(rows) ? rows : body;
+    added.forEach(r => leads.push(r));
+    importParsed = [];
+    renderImportPreview();
+    renderLeadsStats(); renderLeads();
+    msg.textContent = t("importDone").replace("{n}", added.length);
+    msg.className = "ok";
+    btn.classList.add("hidden");
+    $("#importText").value = "";
+  } catch (e) {
+    msg.textContent = t("importFail") + e.message;
+    msg.className = "err";
+  } finally {
+    btn.disabled = false;
+  }
+});
 $("#ldCloseBtn").addEventListener("click", closeLeadDetail);
 $("#leadOverlay").addEventListener("click", e => { if (e.target.id === "leadOverlay") closeLeadDetail(); });
 $("#ldPromoteBtn").addEventListener("click", async () => {
