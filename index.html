@@ -78,8 +78,8 @@ a{color:var(--accent)}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-top:16px}
 .tabs button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 14px}
 .tabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
-.subitem{border:1px solid var(--line);border-radius:8px;padding:10px;margin:8px 0;font-size:14px}
-.subitem .meta{color:var(--muted);font-size:12px}
+.subitem{border:1px solid var(--line);border-radius:8px;padding:10px;margin:8px 0;font-size:14px;overflow-wrap:anywhere}
+.subitem .meta{color:var(--muted);font-size:12px;overflow-wrap:anywhere}
 /* 主畫面分頁（品牌主檔／名單池） */
 .viewtabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
 .viewtabs button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 18px;font-weight:700}
@@ -169,10 +169,22 @@ a{color:var(--accent)}
   <!-- 主畫面 -->
   <section id="mainView" class="hidden">
     <div class="viewtabs">
-      <button id="viewCompaniesBtn" type="button" class="on" data-i18n="tabCompanies">品牌主檔</button>
+      <button id="viewDashboardBtn" type="button" class="on" data-i18n="tabDashboard">儀表板</button>
+      <button id="viewCompaniesBtn" type="button" data-i18n="tabCompanies">品牌主檔</button>
       <button id="viewLeadsBtn" type="button" data-i18n="tabLeads">名單池</button>
     </div>
-    <div id="companiesView">
+    <div id="dashboardView">
+      <div class="card"><div id="dashStats" class="stats"></div></div>
+      <div class="card"><h3 data-i18n="dashQueue">待辦佇列</h3><div id="dashQueue"><span class="muted">載入中…</span></div></div>
+      <div class="card"><h3 data-i18n="dashFunnel">開發漏斗</h3><div id="dashFunnel"></div></div>
+      <div class="card"><h3 data-i18n="dashRecent">最新研究紀錄</h3><div id="dashRecent"></div></div>
+      <div class="card"><div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button id="dashGoCompanies" class="btn" type="button" data-i18n="dashGoCompanies">前往品牌主檔</button>
+        <button id="dashGoLeads" class="btn ghost" type="button" data-i18n="dashGoLeads">前往名單池</button>
+        <button id="dashRefresh" class="btn ghost" type="button" data-i18n="dashRefresh">重新整理</button>
+      </div><div id="dashMeta" class="muted" style="margin-top:8px"></div></div>
+    </div>
+    <div id="companiesView" class="hidden">
     <div class="card">
       <div class="stats" id="stats"></div>
     </div>
@@ -377,7 +389,16 @@ const I18N = {
     researchStateNone:"未研究", researchStateRequested:"已請求", researchStateInProgress:"研究中",
     researchStateDone:"已研究", researchStateFailed:"研究失敗",
     apolloStateRequested:"Apollo 已請求", apolloStateInProgress:"Apollo 進行中",
-    apolloStateDone:"Apollo 已完成", apolloStateFailed:"Apollo 失敗"
+    apolloStateDone:"Apollo 已完成", apolloStateFailed:"Apollo 失敗",
+    tabDashboard:"儀表板", dashQueue:"待辦佇列", dashFunnel:"開發漏斗", dashRecent:"最新研究紀錄",
+    dashGoCompanies:"前往品牌主檔", dashGoLeads:"前往名單池", dashRefresh:"重新整理",
+    dashEmpty:"目前沒有待辦事項。", dashPendingReview:"待審核研究", dashApolloRunning:"Apollo 進行中",
+    dashResearchRunning:"研究進行中", dashLogNotReady:"研究紀錄表尚未建立（請先執行 sql-17）。",
+    dashLoadFail:"儀表板載入失敗：", dashLeadsLoading:"名單載入中…", dashDataStatus:"資料狀態",
+    logTitle:"研究紀錄", logEmpty:"尚無研究紀錄。", logLoadFail:"研究紀錄載入失敗：",
+    logConf:"信心度", logObserved:"觀察日", logSource:"來源", logEvidence:"證據",
+    logApolloProfile:"Apollo 公司頁", logPending:"待審核", logApproved:"已核准",
+    logHeld:"暫扣", logRejected:"退回", logSuperseded:"已取代"
   },
   en: {
     appTitle:"AMI CRM — US Brand Development", logout:"Log out",
@@ -447,7 +468,16 @@ const I18N = {
     researchStateNone:"Not researched", researchStateRequested:"Requested", researchStateInProgress:"Researching",
     researchStateDone:"Researched", researchStateFailed:"Research failed",
     apolloStateRequested:"Apollo requested", apolloStateInProgress:"Apollo running",
-    apolloStateDone:"Apollo done", apolloStateFailed:"Apollo failed"
+    apolloStateDone:"Apollo done", apolloStateFailed:"Apollo failed",
+    tabDashboard:"Dashboard", dashQueue:"Action queue", dashFunnel:"Pipeline funnel", dashRecent:"Latest research log",
+    dashGoCompanies:"Open companies", dashGoLeads:"Open leads", dashRefresh:"Refresh",
+    dashEmpty:"Nothing pending.", dashPendingReview:"Research pending review", dashApolloRunning:"Apollo running",
+    dashResearchRunning:"Research running", dashLogNotReady:"Research log table not created yet (run sql-17 first).",
+    dashLoadFail:"Dashboard load failed: ", dashLeadsLoading:"Loading leads…", dashDataStatus:"Data status",
+    logTitle:"Research log", logEmpty:"No research records yet.", logLoadFail:"Failed to load research log: ",
+    logConf:"Confidence", logObserved:"Observed", logSource:"Source", logEvidence:"Evidence",
+    logApolloProfile:"Apollo company page", logPending:"Pending", logApproved:"Approved",
+    logHeld:"Held", logRejected:"Rejected", logSuperseded:"Superseded"
   }
 };
 /* 欄位標籤（64 欄） */
@@ -570,7 +600,12 @@ const api = {
   researchRequests: leadId => sb("/rest/v1/crm_research_requests?lead_id=eq." + encodeURIComponent(leadId) + "&select=*&order=requested_at.desc&limit=5", { headers: headers() }),
   addResearchRequest: body => sb("/rest/v1/crm_research_requests", { method: "POST", headers: headers(true), body: JSON.stringify(body) }),
   apolloRequests: leadId => sb("/rest/v1/crm_apollo_requests?lead_id=eq." + encodeURIComponent(leadId) + "&select=*&order=requested_at.desc&limit=5", { headers: headers() }),
-  addApolloRequest: body => sb("/rest/v1/crm_apollo_requests", { method: "POST", headers: headers(true), body: JSON.stringify(body) })
+  addApolloRequest: body => sb("/rest/v1/crm_apollo_requests", { method: "POST", headers: headers(true), body: JSON.stringify(body) }),
+  /* 研究紀錄（crm_research_log）：明細＋儀表板共用 */
+  researchLog: brandId => sb("/rest/v1/crm_research_log?brand_id=eq." + encodeURIComponent(brandId) + "&select=*&order=observed_at.desc,created_at.desc&limit=200", { headers: headers() }),
+  researchLogAll: () => sb("/rest/v1/crm_research_log?select=*&order=created_at.desc&limit=1000", { headers: headers() }),
+  researchRequestsAll: () => sb("/rest/v1/crm_research_requests?select=*&order=requested_at.desc&limit=100", { headers: headers() }),
+  apolloRequestsAll: () => sb("/rest/v1/crm_apollo_requests?select=*&order=requested_at.desc&limit=100", { headers: headers() })
 };
 
 /* ---------- 語言 ---------- */
@@ -583,6 +618,7 @@ function applyLang() {
   renderLeadsStats(); renderLeads();
   if (current) renderDetail(current, true);
   if (currentLead) openLeadDetail(currentLead);
+  if (mainViewTab === "dashboard") renderDashboard();
   syncStickyTop();
 }
 $("#langBtn").addEventListener("click", () => {
@@ -632,6 +668,7 @@ $("#loginBtn").addEventListener("click", async () => {
     $("#password").value = "";
     showMain();
     await loadCompanies();
+    showMainTab("dashboard");
   } catch (e) {
     $("#loginErr").textContent = t("loginFail") + " (" + e.message + ")";
   } finally {
@@ -845,6 +882,7 @@ async function loadCompanies() {
     $("#msg").textContent = "";
     listPage = 1;
     renderFilterOptions(); renderStats(); renderList(); syncStickyTop();
+    if (mainViewTab === "dashboard") renderDashboard();
   } catch (e) {
     $("#msg").textContent = t("loadFail") + e.message;
   }
@@ -893,7 +931,8 @@ function renderDetail(c, keepTab) {
     fields.forEach(f => { html += `<dt>${esc(fl(f))}</dt><dd>${fieldVal(c, f)}</dd>`; });
     html += `</dl>`;
   });
-  $("#tab-info").innerHTML = html;
+  $("#tab-info").innerHTML = html + `<h3>${esc(t("logTitle"))}</h3><div id="researchLog"></div>`;
+  loadResearchLog(c.id, $("#researchLog"));
   document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === tab));
   ["info","contacts","deals","activities"].forEach(x => $("#tab-" + x).classList.toggle("hidden", x !== tab));
   if (tab !== "info") loadSubtab(tab);
@@ -1046,14 +1085,129 @@ async function delSub(kind, table, id) {
 /* ---------- 名單池 ---------- */
 function showMainTab(which) {
   mainViewTab = which;
+  $("#dashboardView").classList.toggle("hidden", which !== "dashboard");
   $("#companiesView").classList.toggle("hidden", which !== "companies");
   $("#leadsView").classList.toggle("hidden", which !== "leads");
+  $("#viewDashboardBtn").classList.toggle("on", which === "dashboard");
   $("#viewCompaniesBtn").classList.toggle("on", which === "companies");
   $("#viewLeadsBtn").classList.toggle("on", which === "leads");
   if (which === "leads" && !leadsLoaded) loadLeads();
+  if (which === "dashboard") renderDashboard();
 }
 $("#viewCompaniesBtn").addEventListener("click", () => showMainTab("companies"));
 $("#viewLeadsBtn").addEventListener("click", () => showMainTab("leads"));
+$("#viewDashboardBtn").addEventListener("click", () => showMainTab("dashboard"));
+$("#dashGoCompanies").addEventListener("click", () => showMainTab("companies"));
+$("#dashGoLeads").addEventListener("click", () => showMainTab("leads"));
+$("#dashRefresh").addEventListener("click", () => { dashCache = null; renderDashboard(); });
+
+/* ---------- 儀表板：操作入口＋資料狀態＋統計 ---------- */
+function brandNameById(id) {
+  const c = companies.find(x => x.id === id);
+  if (c) return c.name || id;
+  const l = leads.find(x => x.id === id);
+  return l ? (l.brand || id) : id;
+}
+function brandKindById(id) {
+  if (companies.some(x => x.id === id)) return "company";
+  if (leads.some(x => x.id === id)) return "lead";
+  return "company";
+}
+function openBrandById(id) {
+  const kind = brandKindById(id);
+  if (kind === "lead") {
+    const l = leads.find(x => x.id === id);
+    if (l) { showMainTab("leads"); openLeadDetail(l); }
+    return;
+  }
+  const c = companies.find(x => x.id === id);
+  if (c) { showMainTab("companies"); openDetail(c); }
+}
+function funnelRow(label, n, max) {
+  const pct = max > 0 ? Math.max(2, Math.round(n / max * 100)) : 0;
+  return `<div style="margin:8px 0"><div style="display:flex;justify-content:space-between"><span>${esc(label)}</span><b>${n}</b></div>
+    <div style="height:10px;background:#e8eef2;border-radius:99px;margin-top:4px"><div style="height:10px;width:${pct}%;background:var(--accent);border-radius:99px"></div></div></div>`;
+}
+async function renderDashboard() {
+  const statsEl = $("#dashStats"), queueEl = $("#dashQueue"), funnelEl = $("#dashFunnel"), recentEl = $("#dashRecent"), metaEl = $("#dashMeta");
+  if (!statsEl) return;
+  /* 統計卡：主檔＋名單皆為本機已載資料；待審核／進行中由下方抓取補上 */
+  const done = companies.filter(c => c.research_status === "done").length;
+  const outsourced = companies.filter(c => c.factory === "委外證據").length;
+  const leadTotal = leadsLoaded ? leads.length : null;
+  const leadDone = leadsLoaded ? leads.filter(l => l.research_status === "done").length : null;
+  const leadPromoted = leadsLoaded ? leads.filter(l => l.status === "promoted").length : null;
+  let html = `<div class="stat"><b>${companies.length || "—"}</b><span>${esc(t("tabCompanies"))}</span></div>`;
+  html += `<div class="stat"><b>${done}</b><span>${esc(t("researchDone"))}</span></div>`;
+  html += `<div class="stat"><b>${outsourced}</b><span>${esc(t("factory"))}：委外證據</span></div>`;
+  html += `<div class="stat"><b>${leadTotal == null ? "…" : leadTotal}</b><span>${esc(t("tabLeads"))}</span></div>`;
+  html += `<div class="stat"><b>${leadDone == null ? "…" : leadDone}</b><span>${esc(t("researchStateDone"))}</span></div>`;
+  html += `<div class="stat"><b>${leadPromoted == null ? "…" : leadPromoted}</b><span>${esc(t("leadStatPromoted"))}</span></div>`;
+  html += `<div class="stat" id="dashStatPending"><b>…</b><span>${esc(t("dashPendingReview"))}</span></div>`;
+  html += `<div class="stat" id="dashStatApollo"><b>…</b><span>${esc(t("dashApolloRunning"))}</span></div>`;
+  statsEl.innerHTML = html;
+  /* 開發漏斗 */
+  const steps = [
+    [t("tabLeads"), leadTotal == null ? 0 : leadTotal],
+    [t("researchStateDone"), leadDone == null ? 0 : leadDone],
+    [t("leadStatPromoted"), leadPromoted == null ? 0 : leadPromoted],
+    [t("tabCompanies"), companies.length],
+    [t("researchDone"), done],
+    [t("factory") + "：委外證據", outsourced],
+    [t("colContact"), companies.filter(c => (c.contact || "").trim() !== "").length],
+  ];
+  const max = Math.max(1, ...steps.map(s => s[1]));
+  funnelEl.innerHTML = leadTotal == null
+    ? `<div class="muted">${esc(t("dashLeadsLoading"))}</div>` + steps.slice(3).map(s => funnelRow(s[0], s[1], max)).join("")
+    : steps.map(s => funnelRow(s[0], s[1], max)).join("");
+  /* 待辦佇列＋最新研究紀錄：抓 log 與請求表 */
+  queueEl.innerHTML = `<span class="muted">${esc(t("loading"))}</span>`;
+  recentEl.innerHTML = `<span class="muted">${esc(t("loading"))}</span>`;
+  let logRows = null, logErr = null;
+  try { logRows = await api.researchLogAll(); } catch (e) { logErr = e; }
+  let reqRows = [], apRows = [];
+  try { reqRows = await api.researchRequestsAll(); } catch (e) { reqRows = []; }
+  try { apRows = await api.apolloRequestsAll(); } catch (e) { apRows = []; }
+  const pending = logErr ? [] : (logRows || []).filter(r => r.status === "pending");
+  const apRunning = apRows.filter(r => r.status === "requested" || r.status === "in_progress").length;
+  const reqRunning = reqRows.filter(r => r.status === "requested" || r.status === "in_progress");
+  const elP = $("#dashStatPending"), elA = $("#dashStatApollo");
+  if (elP) elP.querySelector("b").textContent = logErr ? "—" : pending.length;
+  if (elA) elA.querySelector("b").textContent = apRunning;
+  const items = [];
+  if (logErr) {
+    queueEl.innerHTML = `<span class="err">${esc(t("dashLogNotReady"))}</span>`;
+  } else {
+    const byBrand = {};
+    pending.forEach(r => { (byBrand[r.brand_id] = byBrand[r.brand_id] || []).push(r); });
+    Object.keys(byBrand).forEach(id => {
+      items.push(`<div class="subitem" data-brand="${esc(id)}" style="cursor:pointer"><b>${esc(brandNameById(id))}</b> · ${byBrand[id].length} ${esc(t("dashPendingReview"))}<br><span class="meta">${esc(byBrand[id].map(r => logFieldLabel(r.field)).join("、"))}</span></div>`);
+    });
+    reqRunning.forEach(r => {
+      items.push(`<div class="subitem" data-brand="${esc(r.lead_id)}" style="cursor:pointer"><b>${esc(brandNameById(r.lead_id))}</b> · ${esc(t("dashResearchRunning"))}<br><span class="meta">${esc(r.status)}</span></div>`);
+    });
+    apRows.filter(r => r.status === "requested" || r.status === "in_progress").forEach(r => {
+      items.push(`<div class="subitem" data-brand="${esc(r.lead_id)}" style="cursor:pointer"><b>${esc(brandNameById(r.lead_id))}</b> · ${esc(t("dashApolloRunning"))}<br><span class="meta">${esc(r.status)}</span></div>`);
+    });
+    queueEl.innerHTML = items.length ? items.join("") : `<div class="muted">${esc(t("dashEmpty"))}</div>`;
+  }
+  if (logErr) {
+    recentEl.innerHTML = `<span class="err">${esc(t("dashLogNotReady"))}</span>`;
+  } else {
+    const recent = (logRows || []).slice(0, 10);
+    recentEl.innerHTML = recent.length ? recent.map(r => `<div class="subitem" data-brand="${esc(r.brand_id)}" style="cursor:pointer"><b>${esc(brandNameById(r.brand_id))}</b> · ${esc(logFieldLabel(r.field))} ${logStatusTag(r.status)}<br>${logValueHtml(r)}<br><span class="meta">${esc(r.observed_at || "")}${r.source_ref ? " · " + esc(r.source_ref) : ""}</span></div>`).join("") : `<div class="muted">${esc(t("logEmpty"))}</div>`;
+  }
+  metaEl.textContent = `${t("dashDataStatus") || ""} ${companies.length} / ${leadTotal == null ? "…" : leadTotal} / ${logErr ? "—" : (logRows || []).length} · ${new Date().toLocaleString(lang === "en" ? "en-US" : "zh-TW")}`;
+  if (!leadsLoaded) loadLeads();
+}
+$("#dashQueue").addEventListener("click", e => {
+  const it = e.target.closest("[data-brand]");
+  if (it) openBrandById(it.dataset.brand);
+});
+$("#dashRecent").addEventListener("click", e => {
+  const it = e.target.closest("[data-brand]");
+  if (it) openBrandById(it.dataset.brand);
+});
 
 function filteredLeads() {
   const q = $("#lq").value.trim().toLowerCase();
@@ -1160,7 +1314,7 @@ function openLeadDetail(l) {
     html += `<dt>${esc(label)}</dt><dd>${leadFieldVal(l, f)}</dd>`;
   });
   html += `</dl>`;
-  $("#ldBody").innerHTML = html;
+  $("#ldBody").innerHTML = html + `<h3 style="margin-top:14px">${esc(t("logTitle"))}</h3><div id="ldResearchLog"></div>`;
   const done = l.status === "promoted" || l.status === "rejected";
   $("#ldPromoteBtn").disabled = done || leadBusy === l.id;
   $("#ldRejectBtn").disabled = done || leadBusy === l.id;
@@ -1170,6 +1324,7 @@ function openLeadDetail(l) {
   $("#leadOverlay").classList.remove("hidden");
   loadLeadResearch(l);
   loadLeadApollo(l);
+  loadResearchLog(l.id, $("#ldResearchLog"));
 }
 function closeLeadDetail() {
   $("#leadOverlay").classList.add("hidden");
@@ -1273,6 +1428,7 @@ async function saveLeadEdit() {
     exitLeadEdit();
     openLeadDetail(l);
     renderLeadsStats(); renderLeads();
+    if (mainViewTab === "dashboard") renderDashboard();
     const m = $("#ldMsg");
     m.textContent = t("leadSaved");
     m.className = "ok";
@@ -1305,6 +1461,41 @@ async function loadLeadResearch(l) {
     if (Array.isArray(rows) && rows.length) leadResearch = rows[0];
   } catch (e) { leadResearch = null; }
   if (currentLead && currentLead.id === l.id) renderLeadResearch();
+}
+/* ---------- 研究紀錄（crm_research_log）：主檔＋名單明細共用 ---------- */
+function logStatusTag(s) {
+  const cls = { approved: " green", rejected: " a", pending: " b" }[s] || "";
+  const key = { pending: "logPending", approved: "logApproved", held: "logHeld", rejected: "logRejected", superseded: "logSuperseded" }[s] || "logPending";
+  return `<span class="tag${cls}">${esc(t(key))}</span>`;
+}
+function logFieldLabel(f) {
+  if (f === "apollo_profile") return t("logApolloProfile");
+  return fl(f);
+}
+function logValueHtml(r) {
+  const v = r.value || "";
+  if (!v) return "—";
+  if (isUrl(v)) {
+    const short = v.length > 60 ? v.slice(0, 60) + "…" : v;
+    return `<a href="${esc(v)}" target="_blank" rel="noopener">${esc(short)}</a>`;
+  }
+  return esc(v);
+}
+function researchLogHtml(rows) {
+  if (!rows.length) return `<div class="muted">${esc(t("logEmpty"))}</div>`;
+  return rows.map(r => `<div class="subitem"><b>${esc(logFieldLabel(r.field))}</b> ${logStatusTag(r.status)}<br>
+    ${logValueHtml(r)}<br>
+    <span class="meta">${esc(t("logConf"))}: ${esc(r.confidence || "—")} · ${esc(t("logObserved"))}: ${esc(r.observed_at || "—")} · ${esc(t("logSource"))}: ${esc(r.source_type || "")}${r.source_ref ? " · " + esc(r.source_ref) : ""}${r.note ? " · " + esc(r.note) : ""}${r.evidence_url && r.field !== "apollo_profile" ? ` · <a href="${esc(r.evidence_url)}" target="_blank" rel="noopener">${esc(t("logEvidence"))}</a>` : ""}</span></div>`).join("");
+}
+async function loadResearchLog(brandId, el) {
+  if (!el) return;
+  el.innerHTML = `<span class="muted">${esc(t("loading"))}</span>`;
+  try {
+    const rows = await api.researchLog(brandId);
+    el.innerHTML = researchLogHtml(Array.isArray(rows) ? rows : []);
+  } catch (e) {
+    el.innerHTML = `<span class="err">${esc(t("logLoadFail"))}${esc(e.message)}</span>`;
+  }
 }
 let researchRequesting = false;
 async function requestLeadResearch() {
@@ -1527,6 +1718,7 @@ async function loadLeads() {
     leadPage = 1;
     setLeadsMsg("", "muted");
     renderLeadsStats(); renderLeads();
+    if (mainViewTab === "dashboard") renderDashboard();
   } catch (e) {
     setLeadsMsg(t("loadFail") + e.message, "err");
   }
@@ -1592,6 +1784,7 @@ handleRecoveryHash().then(inRecovery => {
   if (session && session.access_token) {
     showMain();
     loadCompanies();
+    showMainTab("dashboard");
   } else {
     showLogin();
   }
