@@ -372,7 +372,12 @@ const I18N = {
     leadPromotedPartial:"品牌已建立，但名單狀態更新失敗（請在 Supabase 手動將此名單改為已晉升）：",
     leadActionFail:"操作失敗：", leadNoDomain:"這家沒有網域，無法晉升（主檔網域為必填且唯一，請先補網域）。",
     leadNoResult:"沒有符合的名單。", leadShowing:"名單共 {n} 筆，顯示 {m} 筆",
-    leadStatTotal:"名單總數", leadStatNew:"新名單", leadStatPromoted:"已晉升"
+    leadStatTotal:"名單總數", leadStatNew:"新名單", leadStatPromoted:"已晉升", leadStatResearched:"已研究",
+    researchDone:"研究完成",
+    researchStateNone:"未研究", researchStateRequested:"已請求", researchStateInProgress:"研究中",
+    researchStateDone:"已研究", researchStateFailed:"研究失敗",
+    apolloStateRequested:"Apollo 已請求", apolloStateInProgress:"Apollo 進行中",
+    apolloStateDone:"Apollo 已完成", apolloStateFailed:"Apollo 失敗"
   },
   en: {
     appTitle:"AMI CRM — US Brand Development", logout:"Log out",
@@ -437,7 +442,12 @@ const I18N = {
     leadPromotedPartial:"Company was created, but the lead status update failed (set this lead to promoted manually in Supabase): ",
     leadActionFail:"Action failed: ", leadNoDomain:"This lead has no domain, so it cannot be promoted (company domain is required and unique — add a domain first).",
     leadNoResult:"No matching leads.", leadShowing:"{n} leads in total, showing {m}",
-    leadStatTotal:"Total leads", leadStatNew:"New", leadStatPromoted:"Promoted"
+    leadStatTotal:"Total leads", leadStatNew:"New", leadStatPromoted:"Promoted", leadStatResearched:"Researched",
+    researchDone:"Research done",
+    researchStateNone:"Not researched", researchStateRequested:"Requested", researchStateInProgress:"Researching",
+    researchStateDone:"Researched", researchStateFailed:"Research failed",
+    apolloStateRequested:"Apollo requested", apolloStateInProgress:"Apollo running",
+    apolloStateDone:"Apollo done", apolloStateFailed:"Apollo failed"
   }
 };
 /* 欄位標籤（64 欄） */
@@ -490,6 +500,19 @@ const STAGE_LABEL = { "研究中":["研究中","Research"], "初步接觸":["初
 const LEAD_STATUS_LABEL = { "new":["leadStNew","new"], "qualified":["leadStQualified","qualified"], "promoted":["leadStPromoted","promoted"], "rejected":["leadStRejected","rejected"] };
 const leadStatusLabel = s => (LEAD_STATUS_LABEL[s] ? t(LEAD_STATUS_LABEL[s][0]) : s);
 const leadStatusTag = s => s === "promoted" ? "green" : s === "rejected" ? "grey" : s === "qualified" ? "" : "b";
+/* 名單研究狀態 (crm_leads.research_status / apollo_status): 缺欄時視為 none, 顯示上隱藏 */
+const RESEARCH_STATE_KEY = { none: "researchStateNone", requested: "researchStateRequested", in_progress: "researchStateInProgress", done: "researchStateDone", failed: "researchStateFailed" };
+const APOLLO_STATE_KEY = { requested: "apolloStateRequested", in_progress: "apolloStateInProgress", done: "apolloStateDone", failed: "apolloStateFailed" };
+const researchStateLabel = s => t(RESEARCH_STATE_KEY[s || "none"] || "researchStateNone");
+const apolloStateLabel = s => APOLLO_STATE_KEY[s] ? t(APOLLO_STATE_KEY[s]) : "";
+const researchTags = l => {
+  let h = "";
+  const rs = l.research_status || "none";
+  if (rs !== "none") h += `<span class="tag ${rs === "done" ? "green" : rs === "failed" ? "grey" : "b"}">${esc(researchStateLabel(rs))}</span> `;
+  const as = l.apollo_status || "none";
+  if (as !== "none") h += `<span class="tag ${as === "done" ? "green" : as === "failed" ? "grey" : "b"}">${esc(apolloStateLabel(as))}</span>`;
+  return h;
+};
 const fmtMoney = v => v == null || v === "" ? "—" : "$" + Math.round(Number(v)).toLocaleString("en-US");
 const fmtInt = v => v == null || v === "" ? "—" : Number(v).toLocaleString("en-US");
 const bandShort = b => (b || "").split(":")[0] || "—";
@@ -733,6 +756,7 @@ function renderStats() {
   const byStage = {};
   companies.forEach(c => { byStage[c.stage || "—"] = (byStage[c.stage || "—"] || 0) + 1; });
   let html = `<div class="stat"><b>${companies.length}</b><span>${esc(t("statTotal"))}</span></div>`;
+  html += `<div class="stat"><b>${companies.filter(c => c.research_status === "done").length}</b><span>${esc(t("researchDone"))}</span></div>`;
   byPri.forEach(x => { html += `<div class="stat"><b>${x.n}</b><span>${esc(t("priority"))} ${esc(x.k)}</span></div>`; });
   Object.keys(byStage).sort().forEach(s => { html += `<div class="stat"><b>${byStage[s]}</b><span>${esc(t("statStage").replace("{s}", stageLabel(s)))}</span></div>`; });
   el.innerHTML = html;
@@ -762,7 +786,7 @@ function renderList() {
     d.innerHTML =
       `<span><span class="nm">${esc(c.name || t("untitled"))}</span><br><span class="dm">${c.domain ? domainLink(c.domain) : ""}</span></span>` +
       `<span><span class="tag ${c.priority === "A" ? "a" : "b"}">${esc(c.priority || "")}</span></span>` +
-      `<span>${esc(stageLabel(c.stage || ""))}</span>` +
+      `<span>${esc(stageLabel(c.stage || ""))}${c.research_status === "done" ? ` <span class="tag green">${esc(t("researchDone"))}</span>` : ""}</span>` +
       `<span>${esc(c.factory || "")}</span>` +
       `<span class="dm">${esc(c.contact || "")}</span>`;
     d.addEventListener("click", e => { if (e.target.closest("a")) return; openDetail(c); });
@@ -855,6 +879,7 @@ function renderDetail(c, keepTab) {
   $("#dTags").innerHTML =
     `<span class="tag ${c.priority === "A" ? "a" : "b"}">${esc(c.priority || "")}</span> ` +
     `<span class="tag">${esc(stageLabel(c.stage || ""))}</span> ` +
+    `${c.research_status === "done" ? `<span class="tag green">${esc(t("researchDone"))}</span> ` : ""}` +
     `<span class="tag">${esc(c.factory || "")}</span> ` +
     `<span class="tag">${esc(c.format || "")}</span>`;
   $("#eStage").value = c.stage || "研究中";
@@ -1048,7 +1073,8 @@ function renderLeadsStats() {
     `<div class="stat"><b>${n(l => (l.revenue_band || "").indexOf("A1") === 0)}</b><span>A1</span></div>` +
     `<div class="stat"><b>${n(l => (l.revenue_band || "").indexOf("A2") === 0)}</b><span>A2</span></div>` +
     `<div class="stat"><b>${n(l => l.status === "new")}</b><span>${esc(t("leadStatNew"))}</span></div>` +
-    `<div class="stat"><b>${n(l => l.status === "promoted")}</b><span>${esc(t("leadStatPromoted"))}</span></div>`;
+    `<div class="stat"><b>${n(l => l.status === "promoted")}</b><span>${esc(t("leadStatPromoted"))}</span></div>` +
+    `<div class="stat"><b>${n(l => l.research_status === "done")}</b><span>${esc(t("leadStatResearched"))}</span></div>`;
 }
 const LEAD_PAGE_SIZE = 50;
 let leadPage = 1;
@@ -1067,7 +1093,7 @@ function renderLeads() {
     const busy = leadBusy === l.id;
     const done = l.status === "promoted" || l.status === "rejected";
     d.innerHTML =
-      `<span><span class="nm">${esc(l.brand || t("untitled"))}</span>${l.domain ? `<br><span class="dm">${domainLink(l.domain)}</span>` : ""}</span>` +
+      `<span><span class="nm">${esc(l.brand || t("untitled"))}</span>${l.domain ? `<br><span class="dm">${domainLink(l.domain)}</span>` : ""}${researchTags(l) ? `<br>${researchTags(l)}` : ""}</span>` +
       `<span class="num" data-l="${esc(t("colRevenue"))}">${esc(fmtMoney(l.monthly_revenue))}</span>` +
       `<span class="num" data-l="${esc(t("colSales"))}">${esc(fmtInt(l.monthly_sales))}</span>` +
       `<span data-l="${esc(t("colBand"))}"><span class="tag b">${esc(bandShort(l.revenue_band))}</span></span>` +
@@ -1090,12 +1116,15 @@ const LEAD_FIELD_LABEL = {
   source_id: ["來源編號", "Source ID"], monthly_sales: ["月銷量", "Monthly sales"],
   monthly_revenue: ["月營收", "Monthly revenue"], revenue_band: ["營收級距", "Revenue band"],
   tier: ["級別", "Tier"], status: ["狀態", "Status"], dedupe_status: ["去重狀態", "Dedupe status"],
+  research_status: ["研究狀態", "Research status"], apollo_status: ["Apollo 狀態", "Apollo status"],
   matched_company_id: ["已晉升品牌", "Promoted company"], date_sc: ["抓取日", "Scraped on"],
   created_at: ["建立日", "Created"], updated_at: ["更新日", "Updated"],
 };
 function leadFieldVal(l, f) {
   const v = l[f];
   if (v == null || v === "") return "—";
+  if (f === "research_status") return esc(researchStateLabel(v));
+  if (f === "apollo_status") return v === "none" ? "—" : esc(apolloStateLabel(v));
   if (f === "monthly_revenue") return esc(fmtMoney(v));
   if (f === "monthly_sales") return esc(fmtInt(v));
   if (f === "status") return esc(leadStatusLabel(v));
@@ -1293,6 +1322,8 @@ async function requestLeadResearch() {
     });
     leadResearch = Array.isArray(rows) ? rows[0] : rows;
     renderLeadResearch();
+    /* 名單留底: 研究狀態即寫 requested (欄位未建時忽略, 請求本身已成立) */
+    try { await api.patchLead(l.id, { research_status: "requested" }); l.research_status = "requested"; renderLeadsStats(); renderLeads(); } catch (e) { /* ignore */ }
     msg.textContent = t("leadResearchRequested");
     msg.className = "ok";
   } catch (e) {
@@ -1343,6 +1374,8 @@ async function requestLeadApollo() {
     });
     leadApollo = Array.isArray(rows) ? rows[0] : rows;
     renderLeadApollo();
+    /* 名單留底: Apollo 狀態即寫 requested (欄位未建時忽略, 請求本身已成立) */
+    try { await api.patchLead(l.id, { apollo_status: "requested" }); l.apollo_status = "requested"; renderLeads(); } catch (e) { /* ignore */ }
     msg.textContent = t("leadApolloRequested");
     msg.className = "ok";
   } catch (e) {
