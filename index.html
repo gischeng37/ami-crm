@@ -89,6 +89,9 @@ a{color:var(--accent)}
 /* 配方區標題列：標題＋匯出按鈕同列，手機寬度按鈕自動換行 */
 .fxhead{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:14px 0 8px}
 .fxhead h3{flex:1;margin:0}
+/* 配方總覽（formula v2.0 Phase 1）：表格橫捲，手機寬度不撐破版面 */
+.fxwrap{overflow-x:auto}
+.fxwrap .fx{min-width:780px}
 /* 主畫面分頁（品牌主檔／名單池） */
 /* 補齊缺口（backfill Phase 1）：維度卡可點選（最多 2 個維度），缺口清單勾選建批 */
 .bfgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
@@ -192,6 +195,7 @@ a{color:var(--accent)}
       <button id="viewDashboardBtn" type="button" class="on" data-i18n="tabDashboard">儀表板</button>
       <button id="viewCompaniesBtn" type="button" data-i18n="tabCompanies">品牌主檔</button>
       <button id="viewLeadsBtn" type="button" data-i18n="tabLeads">名單池</button>
+      <button id="viewFormulasBtn" type="button" data-i18n="tabFormulas">配方管理</button>
     </div>
     <div id="dashboardView">
       <div class="card"><div id="dashStats" class="stats"></div></div>
@@ -217,6 +221,7 @@ a{color:var(--accent)}
         <div id="bfQueue"><span class="muted" data-i18n="loading">載入中…</span></div>
       </div>
       <div class="card"><h3 data-i18n="dashQueue">待辦佇列</h3><div id="dashQueue"><span class="muted">載入中…</span></div></div>
+      <div class="card"><h3 data-i18n="fxDashTitle">配方完整度</h3><div id="fxDashStats" class="stats"></div><div id="fxDashDist" style="margin-top:8px"></div></div>
       <div class="card"><h3 data-i18n="dashFunnel">開發漏斗</h3><div id="dashFunnel"></div></div>
       <div class="card"><h3 data-i18n="dashRecent">最新研究紀錄</h3><div id="dashRecent"></div></div>
       <div class="card"><div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -288,6 +293,34 @@ a{color:var(--accent)}
         <div id="leadsEmpty" class="empty hidden" data-i18n="leadNoResult">沒有符合的名單。</div>
       </div>
       <p id="leadsMsg" class="err"></p>
+    </div>
+    <!-- 配方管理（formula v2.0 Phase 1：總覽唯讀版；不做跨品牌配方對比） -->
+    <div id="formulasView" class="hidden">
+      <div class="card">
+        <div class="stats" id="fxStats"></div>
+      </div>
+      <div class="card">
+        <div class="lfilters">
+          <div class="full-m"><label data-i18n="fxSearchIngredient">成分名</label><input id="fxIngredient" type="search" data-i18n-ph="fxIngredientPh" placeholder="成分名稱，例如 magnesium citrate…"></div>
+          <div><label data-i18n="format">劑型</label><select id="fxForm"><option value="" data-i18n="all">全部</option></select></div>
+          <div><label data-i18n="fxStatus">完整度</label><select id="fxStatus"><option value="" data-i18n="all">全部</option></select></div>
+          <div><button id="fxResetBtn" class="btn ghost" type="button" data-i18n="reset">重設</button></div>
+        </div>
+      </div>
+      <div class="card" style="padding-top:4px">
+        <div id="fxMeta" class="muted" style="padding:10px 8px 0"></div>
+        <div class="fxwrap"><table class="fx" id="fxTable">
+          <thead><tr>
+            <th data-i18n="fxColBrand">品牌</th><th data-i18n="fxColProduct">產品</th><th>ASIN</th>
+            <th data-i18n="format">劑型</th><th data-i18n="formulaServing">每份</th>
+            <th class="num" data-i18n="fxColIngCount">成分列數</th><th class="num" data-i18n="fxColDisclosed">已揭露</th>
+            <th data-i18n="fxColStatus">完整度狀態</th><th data-i18n="fxColLabel">標籤</th>
+          </tr></thead>
+          <tbody id="fxList"></tbody>
+        </table></div>
+        <div id="fxEmpty" class="empty hidden" data-i18n="fxEmpty">沒有符合的產品。</div>
+      </div>
+      <p id="fxMsg" class="err"></p>
     </div>
   </section>
   <p id="msg" class="err"></p>
@@ -472,6 +505,15 @@ const I18N = {
     bfQueueDone:"完成 {n}", bfQueueFailed:"失敗 {n}", bfNoGap:"這個維度沒有待補品牌。",
     bfLoading:"計算缺口中…", bfLoadFail:"缺口計算失敗：",
     bfKindCompany:"主檔", bfKindLead:"名單", bfMissingWhat:"缺：{dims}",
+    /* 配方管理（formula v2.0 Phase 1） */
+    tabFormulas:"配方管理",
+    fxSearchIngredient:"成分名", fxIngredientPh:"成分名稱，例如 magnesium citrate…",
+    fxStatus:"完整度", fxColBrand:"品牌", fxColProduct:"產品", fxColIngCount:"成分列數", fxColDisclosed:"已揭露", fxColStatus:"完整度狀態", fxColLabel:"標籤",
+    fxStComplete:"完整", fxStPartial:"部分揭露", fxStNoAmounts:"無含量", fxStNotCollected:"尚未蒐集",
+    fxNotDisclosed:"未揭露", fxLabelYes:"有", fxLabelNo:"無",
+    fxEmpty:"沒有符合的產品。", fxShowing:"共 {n} 個產品，顯示 {m} 個", fxLoadFail:"配方總覽載入失敗：",
+    fxDashTitle:"配方完整度", fxDashBrands:"有產品的品牌", fxDashProducts:"產品總數", fxDashRate:"含量揭露率",
+    fxDashBlend:"專有混合產品", fxDashNoLabel:"無標籤鏡像產品", fxDashViewNotReady:"配方視圖尚未建立（請先執行 sql-60）。",
     googleSearch:"Google 搜尋",
     domainOverwriteConfirm:"網域已有值「{old}」，確定覆寫為「{new}」？"
   },
@@ -585,6 +627,15 @@ const I18N = {
     bfQueueDone:"done {n}", bfQueueFailed:"failed {n}", bfNoGap:"No brands are missing in this dimension.",
     bfLoading:"Computing gaps…", bfLoadFail:"Failed to compute gaps: ",
     bfKindCompany:"Company", bfKindLead:"Lead", bfMissingWhat:"Missing: {dims}",
+    /* Formula management (formula v2.0 Phase 1) */
+    tabFormulas:"Formulas",
+    fxSearchIngredient:"Ingredient", fxIngredientPh:"Ingredient name, e.g. magnesium citrate…",
+    fxStatus:"Completeness", fxColBrand:"Brand", fxColProduct:"Product", fxColIngCount:"Ingredients", fxColDisclosed:"Disclosed", fxColStatus:"Completeness", fxColLabel:"Label",
+    fxStComplete:"Complete", fxStPartial:"Partial", fxStNoAmounts:"No amounts", fxStNotCollected:"Not collected",
+    fxNotDisclosed:"Not disclosed", fxLabelYes:"Yes", fxLabelNo:"No",
+    fxEmpty:"No matching products.", fxShowing:"{n} products in total, showing {m}", fxLoadFail:"Failed to load formula overview: ",
+    fxDashTitle:"Formula completeness", fxDashBrands:"Brands with products", fxDashProducts:"Total products", fxDashRate:"Disclosure rate",
+    fxDashBlend:"Proprietary-blend products", fxDashNoLabel:"Products without label image", fxDashViewNotReady:"Formula view not created yet (run sql-60 first).",
     googleSearch:"Google search",
     domainOverwriteConfirm:"Domain already has “{old}”. Overwrite it with “{new}”?"
   }
@@ -731,6 +782,10 @@ const api = {
   signalsByBrand: brandId => sb("/rest/v1/crm_signals?brand_id=eq." + encodeURIComponent(brandId) + "&select=*&order=observed_at.desc,created_at.desc&limit=200", { headers: headers() }),
   /* 補齊缺口統計：只拉 brand_id 集合，前端做差集（設計 §4；名單未破 5,000 筆前不走 RPC） */
   productsAll: () => sb("/rest/v1/crm_products?select=brand_id&limit=1000", { headers: headers() }),
+  /* 配方總覽（formula v2.0 Phase 1）：讀 v_formula_completeness 視圖（sql-60） */
+  formulaCompleteness: () => sb("/rest/v1/v_formula_completeness?select=*&order=product_name.asc&limit=1000", { headers: headers() }),
+  /* 成分篩選：對 ingredient_name 做 ilike，只回 product_id */
+  ingredientsByName: name => sb("/rest/v1/crm_formula_ingredients?ingredient_name=ilike.*"+ encodeURIComponent(name) + "*&select=product_id&limit=1000", { headers: headers() }),
   reviewsAll: () => sb("/rest/v1/crm_reviews?select=brand_id&limit=1000", { headers: headers() }),
   signalsRedditAll: () => sb("/rest/v1/crm_signals?source=eq.reddit&select=brand_id&limit=1000", { headers: headers() }),
 };
@@ -746,6 +801,7 @@ function applyLang() {
   if (current) renderDetail(current, true);
   if (currentLead) openLeadDetail(currentLead);
   if (mainViewTab === "dashboard") renderDashboard();
+  if (mainViewTab === "formulas") renderFormulas();
   syncStickyTop();
 }
 $("#langBtn").addEventListener("click", () => {
@@ -1239,14 +1295,18 @@ function showMainTab(which) {
   $("#dashboardView").classList.toggle("hidden", which !== "dashboard");
   $("#companiesView").classList.toggle("hidden", which !== "companies");
   $("#leadsView").classList.toggle("hidden", which !== "leads");
+  $("#formulasView").classList.toggle("hidden", which !== "formulas");
   $("#viewDashboardBtn").classList.toggle("on", which === "dashboard");
   $("#viewCompaniesBtn").classList.toggle("on", which === "companies");
   $("#viewLeadsBtn").classList.toggle("on", which === "leads");
+  $("#viewFormulasBtn").classList.toggle("on", which === "formulas");
   if (which === "leads" && !leadsLoaded) loadLeads();
   if (which === "dashboard") renderDashboard();
+  if (which === "formulas") { if (!fxLoaded) loadFormulas(); else renderFormulas(); }
 }
 $("#viewCompaniesBtn").addEventListener("click", () => showMainTab("companies"));
 $("#viewLeadsBtn").addEventListener("click", () => showMainTab("leads"));
+$("#viewFormulasBtn").addEventListener("click", () => showMainTab("formulas"));
 $("#viewDashboardBtn").addEventListener("click", () => showMainTab("dashboard"));
 $("#dashGoCompanies").addEventListener("click", () => showMainTab("companies"));
 $("#dashGoLeads").addEventListener("click", () => showMainTab("leads"));
@@ -1526,6 +1586,13 @@ async function renderDashboard() {
     bfGapErr = null;
   } catch (e) { bfGapErr = e.message; bfGaps = null; }
   renderBfDims(); renderBfList(); renderBfQueue(reqRows);
+  /* 配方完整度卡（formula v2.0 Phase 1）：讀 v_formula_completeness；失敗只影響本卡，不擋儀表板其餘內容 */
+  try {
+    const fxRowsDash = await api.formulaCompleteness();
+    fxRows = Array.isArray(fxRowsDash) ? fxRowsDash : [];
+    fxLoaded = true;
+    renderFxDash(fxRows, null);
+  } catch (e) { renderFxDash(null, e); }
   const pending = logErr ? [] : (logRows || []).filter(r => r.status === "pending");
   const apRunning = apRows.filter(r => r.status === "requested" || r.status === "in_progress").length;
   const reqRunning = reqRows.filter(r => r.status === "requested" || r.status === "in_progress");
@@ -1889,6 +1956,146 @@ async function loadResearchLog(brandId, el) {
   }
 }
 
+/* ---------- 配方管理總覽（formula v2.0 Phase 1：唯讀版） ----------
+   讀 v_formula_completeness（sql-60）；篩選：成分名（ilike 查 crm_formula_ingredients 再對回產品）、
+   劑型、完整度狀態。點產品列開品牌明細（主檔／名單皆可）。不做跨品牌配方對比。 */
+const FX_STATUS_KEY = { complete: "fxStComplete", partial: "fxStPartial", no_amounts: "fxStNoAmounts", not_collected: "fxStNotCollected" };
+const formulaStatusLabel = s => t(FX_STATUS_KEY[s] || "fxStNotCollected");
+const formulaStatusTag = s => s === "complete" ? "green" : s === "partial" ? "b" : "grey";
+const formulaStatusBadge = s => `<span class="tag ${formulaStatusTag(s)}">${esc(formulaStatusLabel(s))}</span>`;
+let fxRows = [];
+let fxLoaded = false;
+let fxIngredientIds = null; /* 成分篩選命中 product_id 集合；無成分篩選時 null */
+function fxSummary(rows) {
+  const list = rows || [];
+  const total = list.length;
+  const brands = new Set(list.map(r => r.brand_id)).size;
+  const ingTotal = list.reduce((n, r) => n + (r.ingredient_count || 0), 0);
+  const disc = list.reduce((n, r) => n + (r.disclosed_count || 0), 0);
+  const dist = { complete: 0, partial: 0, no_amounts: 0, not_collected: 0 };
+  list.forEach(r => { const s = r.formula_status || "not_collected"; if (dist[s] == null) dist[s] = 0; dist[s]++; });
+  return {
+    total, brands, ingTotal, disc,
+    rate: ingTotal ? Math.round(disc / ingTotal * 100) : 0,
+    dist,
+    blend: list.filter(r => r.proprietary_blend).length,
+    noLabel: list.filter(r => !r.label_mirrored).length
+  };
+}
+function renderFxDash(rows, err) {
+  const statsEl = $("#fxDashStats"), distEl = $("#fxDashDist");
+  if (!statsEl) return;
+  if (err) {
+    statsEl.innerHTML = `<span class="err">${esc(t("fxDashViewNotReady"))}</span>`;
+    if (distEl) distEl.innerHTML = "";
+    return;
+  }
+  const s = fxSummary(rows || []);
+  statsEl.innerHTML =
+    `<div class="stat"><b>${s.brands}</b><span>${esc(t("fxDashBrands"))}</span></div>` +
+    `<div class="stat"><b>${s.total}</b><span>${esc(t("fxDashProducts"))}</span></div>` +
+    `<div class="stat"><b>${s.rate}%</b><span>${esc(t("fxDashRate"))} (${s.disc}/${s.ingTotal})</span></div>` +
+    `<div class="stat"><b>${s.blend}</b><span>${esc(t("fxDashBlend"))}</span></div>` +
+    `<div class="stat"><b>${s.noLabel}</b><span>${esc(t("fxDashNoLabel"))}</span></div>`;
+  if (distEl) {
+    const max = Math.max(1, s.total);
+    distEl.innerHTML = ["complete", "partial", "no_amounts", "not_collected"]
+      .map(k => funnelRow(formulaStatusLabel(k), s.dist[k] || 0, max)).join("");
+  }
+}
+function renderFxFilterOptions() {
+  const fill = (sel, values, labelFn) => {
+    const el = $(sel), cur = el.value;
+    const keep = el.querySelector("option[value='']");
+    el.innerHTML = "";
+    el.appendChild(keep);
+    values.forEach(v => { const o = document.createElement("option"); o.value = v; o.textContent = labelFn ? labelFn(v) : v; el.appendChild(o); });
+    el.value = cur;
+  };
+  fill("#fxForm", [...new Set(fxRows.map(r => r.form).filter(Boolean))].sort());
+  fill("#fxStatus", ["complete", "partial", "no_amounts", "not_collected"], formulaStatusLabel);
+}
+function fxFiltered() {
+  const form = $("#fxForm").value, status = $("#fxStatus").value;
+  return fxRows.filter(r =>
+    (!fxIngredientIds || fxIngredientIds.has(r.product_id)) &&
+    (!form || r.form === form) &&
+    (!status || (r.formula_status || "not_collected") === status));
+}
+function renderFormulas() {
+  const list = fxFiltered();
+  const s = fxSummary(fxRows);
+  const statsEl = $("#fxStats");
+  if (statsEl) {
+    statsEl.innerHTML =
+      `<div class="stat"><b>${s.total}</b><span>${esc(t("fxDashProducts"))}</span></div>` +
+      `<div class="stat"><b>${s.brands}</b><span>${esc(t("fxDashBrands"))}</span></div>` +
+      `<div class="stat"><b>${s.rate}%</b><span>${esc(t("fxDashRate"))} (${s.disc}/${s.ingTotal})</span></div>`;
+  }
+  renderFxFilterOptions();
+  $("#fxMeta").textContent = t("fxShowing").replace("{n}", fxRows.length).replace("{m}", list.length);
+  const box = $("#fxList");
+  box.innerHTML = "";
+  $("#fxEmpty").classList.toggle("hidden", list.length > 0);
+  list.forEach(r => {
+    const tr = document.createElement("tr");
+    tr.style.cursor = "pointer";
+    tr.dataset.product = r.product_id;
+    const asin = r.asin ? `<a href="https://www.amazon.com/dp/${esc(r.asin)}" target="_blank" rel="noopener">${esc(r.asin)}</a>` : "—";
+    tr.innerHTML =
+      `<td>${esc(brandNameById(r.brand_id))}</td>` +
+      `<td>${esc(r.product_name || t("untitled"))}</td>` +
+      `<td>${asin}</td>` +
+      `<td>${esc(r.form || "—")}</td>` +
+      `<td>${esc(r.serving_size || "—")}</td>` +
+      `<td class="num">${r.ingredient_count == null ? "—" : r.ingredient_count}</td>` +
+      `<td class="num">${r.disclosed_count == null ? "—" : r.disclosed_count}</td>` +
+      `<td>${formulaStatusBadge(r.formula_status || "not_collected")}</td>` +
+      `<td>${r.label_mirrored ? esc(t("fxLabelYes")) : esc(t("fxLabelNo"))}</td>`;
+    tr.addEventListener("click", async e => {
+      if (e.target.closest("a")) return;
+      /* 名單品牌須先載入名單池，openBrandById 才找得到 */
+      if (!leadsLoaded) await loadLeads();
+      openBrandById(r.brand_id);
+    });
+    box.appendChild(tr);
+  });
+}
+async function loadFormulas() {
+  const msg = $("#fxMsg");
+  if (msg) msg.textContent = "";
+  try {
+    const rows = await api.formulaCompleteness();
+    fxRows = Array.isArray(rows) ? rows : [];
+    fxLoaded = true;
+    renderFormulas();
+  } catch (e) {
+    if (msg) { msg.textContent = t("fxLoadFail") + e.message; msg.className = "err"; }
+  }
+}
+async function applyFxIngredientFilter() {
+  const q = $("#fxIngredient").value.trim();
+  if (!q) { fxIngredientIds = null; renderFormulas(); return; }
+  try {
+    const rows = await api.ingredientsByName(q);
+    fxIngredientIds = new Set((rows || []).map(r => r.product_id));
+  } catch (e) {
+    fxIngredientIds = new Set();
+    const msg = $("#fxMsg");
+    if (msg) { msg.textContent = t("fxLoadFail") + e.message; msg.className = "err"; }
+  }
+  renderFormulas();
+}
+$("#fxIngredient").addEventListener("input", () => applyFxIngredientFilter());
+["fxForm", "fxStatus"].forEach(id => {
+  $("#" + id).addEventListener("change", () => renderFormulas());
+});
+$("#fxResetBtn").addEventListener("click", () => {
+  $("#fxIngredient").value = ""; $("#fxForm").value = ""; $("#fxStatus").value = "";
+  fxIngredientIds = null;
+  renderFormulas();
+});
+
 /* ---------- 產品與配方（crm_products／crm_formula_ingredients／crm_product_labels） ---------- */
 let labelObjectUrls = [];
 function revokeLabelUrls() {
@@ -1956,7 +2163,11 @@ async function loadProductFormula(p, box) {
       if (nf.length) {
         h += `<div style="margin-top:6px"><b>${esc(t("formulaNutrition"))}</b></div>` +
           `<table class="fx"><thead><tr><th>${esc(t("formulaColIngredient"))}</th><th>${esc(t("formulaColForm"))}</th><th class="num">${esc(t("formulaColAmount"))}</th><th class="num">${esc(t("formulaColDv"))}</th></tr></thead><tbody>` +
-          nf.map(r => `<tr><td>${esc(r.ingredient_name || "")}</td><td>${esc(r.ingredient_form || "—")}</td><td class="num">${esc(fmtAmount(r.amount_value, r.amount_unit))}</td><td class="num">${r.dv_pct == null ? "—" : esc(r.dv_pct) + "%"}</td></tr>`).join("") +
+          nf.map(r => {
+            /* 未揭露列顯示「未揭露」而非空白（amount_status='not_disclosed' 或金額為空） */
+            const amt = (r.amount_status === "not_disclosed" || r.amount_value == null) ? t("fxNotDisclosed") : fmtAmount(r.amount_value, r.amount_unit);
+            return `<tr><td>${esc(r.ingredient_name || "")}</td><td>${esc(r.ingredient_form || "—")}</td><td class="num">${esc(amt)}</td><td class="num">${r.dv_pct == null ? "—" : esc(r.dv_pct) + "%"}</td></tr>`;
+          }).join("") +
           `</tbody></table>`;
       }
       if (il.length) {
@@ -2005,7 +2216,7 @@ async function loadFormulaSection(brandId, el) {
     box.dataset.product = p.id;
     const asinLink = p.asin ? `<a href="https://www.amazon.com/dp/${esc(p.asin)}" target="_blank" rel="noopener">ASIN ${esc(p.asin)}</a>` : "";
     box.innerHTML =
-      `<b>${esc(p.product_name || t("untitled"))}</b>${asinLink ? " · " + asinLink : ""}` +
+      `<b>${esc(p.product_name || t("untitled"))}</b> ${formulaStatusBadge(p.formula_status || "not_collected")}${asinLink ? " · " + asinLink : ""}` +
       productMetaHtml(p) +
       `<div data-ing style="margin-top:8px"><span class="muted">${esc(t("loading"))}</span></div>` +
       `<div data-lab style="margin-top:8px"></div>`;
