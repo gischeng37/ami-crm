@@ -283,9 +283,11 @@ a{color:var(--accent)}
     <div id="ldBody"></div>
     <div id="ldEditBody" class="hidden"></div>
     <div id="ldResearch" class="muted" style="margin-top:10px"></div>
+    <div id="ldApollo" class="muted" style="margin-top:4px"></div>
     <div style="margin-top:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <button id="ldEditBtn" class="btn ghost small" type="button" data-i18n="leadEdit">編輯</button>
       <button id="ldResearchBtn" class="btn ghost small" type="button" data-i18n="leadResearch">研究</button>
+      <button id="ldApolloBtn" class="btn ghost small" type="button" data-i18n="leadApollo">Apollo</button>
       <button id="ldPromoteBtn" class="btn small" type="button" data-i18n="leadPromote">晉升</button>
       <button id="ldRejectBtn" class="btn ghost small" type="button" data-i18n="leadReject">拒絕</button>
       <button id="ldSaveBtn" class="btn small hidden" type="button" data-i18n="leadSave">儲存</button>
@@ -361,6 +363,12 @@ const I18N = {
     leadResearchStatus:"研究：{s}",
     leadResearchRequestedAt:"已請求（{d}）", leadResearchInProgress:"研究中（{d}）",
     leadResearchDone:"已完成（{d}）", leadResearchFailed:"失敗（{d}）",
+    leadApollo:"Apollo",
+    leadApolloConfirm:"確定請求 Apollo 抓取「{b}」的相似公司（約 100 家）？抓完會先比對、交給你審核再匯入，不會自動匯入。",
+    leadApolloRequested:"Apollo 請求已送出。", leadApolloFail:"請求失敗：",
+    leadApolloStatus:"Apollo：{s}",
+    leadApolloRequestedAt:"已請求（{d}）", leadApolloInProgress:"抓取中（{d}）",
+    leadApolloDone:"已完成（{d}）", leadApolloFailed:"失敗（{d}）",
     leadPromotedPartial:"品牌已建立，但名單狀態更新失敗（請在 Supabase 手動將此名單改為已晉升）：",
     leadActionFail:"操作失敗：", leadNoDomain:"這家沒有網域，無法晉升（主檔網域為必填且唯一，請先補網域）。",
     leadNoResult:"沒有符合的名單。", leadShowing:"名單共 {n} 筆，顯示 {m} 筆",
@@ -420,6 +428,12 @@ const I18N = {
     leadResearchStatus:"Research: {s}",
     leadResearchRequestedAt:"Requested ({d})", leadResearchInProgress:"Researching ({d})",
     leadResearchDone:"Done ({d})", leadResearchFailed:"Failed ({d})",
+    leadApollo:"Apollo",
+    leadApolloConfirm:"Request Apollo to fetch similar companies of “{b}” (about 100)? Results are deduped and handed to you for review first — nothing imports automatically.",
+    leadApolloRequested:"Apollo request sent.", leadApolloFail:"Request failed: ",
+    leadApolloStatus:"Apollo: {s}",
+    leadApolloRequestedAt:"Requested ({d})", leadApolloInProgress:"Fetching ({d})",
+    leadApolloDone:"Done ({d})", leadApolloFailed:"Failed ({d})",
     leadPromotedPartial:"Company was created, but the lead status update failed (set this lead to promoted manually in Supabase): ",
     leadActionFail:"Action failed: ", leadNoDomain:"This lead has no domain, so it cannot be promoted (company domain is required and unique — add a domain first).",
     leadNoResult:"No matching leads.", leadShowing:"{n} leads in total, showing {m}",
@@ -531,7 +545,9 @@ const api = {
   addLeadsBulk: body => sb("/rest/v1/crm_leads", { method: "POST", headers: headers(true), body: JSON.stringify(body) }),
   patchLead: (id, body) => sb("/rest/v1/crm_leads?id=eq." + encodeURIComponent(id), { method: "PATCH", headers: headers(true), body: JSON.stringify(body) }),
   researchRequests: leadId => sb("/rest/v1/crm_research_requests?lead_id=eq." + encodeURIComponent(leadId) + "&select=*&order=requested_at.desc&limit=5", { headers: headers() }),
-  addResearchRequest: body => sb("/rest/v1/crm_research_requests", { method: "POST", headers: headers(true), body: JSON.stringify(body) })
+  addResearchRequest: body => sb("/rest/v1/crm_research_requests", { method: "POST", headers: headers(true), body: JSON.stringify(body) }),
+  apolloRequests: leadId => sb("/rest/v1/crm_apollo_requests?lead_id=eq." + encodeURIComponent(leadId) + "&select=*&order=requested_at.desc&limit=5", { headers: headers() }),
+  addApolloRequest: body => sb("/rest/v1/crm_apollo_requests", { method: "POST", headers: headers(true), body: JSON.stringify(body) })
 };
 
 /* ---------- 語言 ---------- */
@@ -1098,6 +1114,7 @@ function openLeadDetail(l) {
   $("#ldBody").classList.remove("hidden");
   $("#ldEditBtn").classList.remove("hidden");
   $("#ldResearchBtn").classList.remove("hidden");
+  $("#ldApolloBtn").classList.remove("hidden");
   $("#ldPromoteBtn").classList.remove("hidden");
   $("#ldRejectBtn").classList.remove("hidden");
   $("#ldSaveBtn").classList.add("hidden");
@@ -1123,6 +1140,7 @@ function openLeadDetail(l) {
   $("#ldMsg").textContent = "";
   $("#leadOverlay").classList.remove("hidden");
   loadLeadResearch(l);
+  loadLeadApollo(l);
 }
 function closeLeadDetail() {
   $("#leadOverlay").classList.add("hidden");
@@ -1178,6 +1196,7 @@ function enterLeadEdit() {
   $("#ldBody").classList.add("hidden");
   $("#ldEditBtn").classList.add("hidden");
   $("#ldResearchBtn").classList.add("hidden");
+  $("#ldApolloBtn").classList.add("hidden");
   $("#ldPromoteBtn").classList.add("hidden");
   $("#ldRejectBtn").classList.add("hidden");
   $("#ldSaveBtn").classList.remove("hidden");
@@ -1190,6 +1209,7 @@ function exitLeadEdit() {
   $("#ldBody").classList.remove("hidden");
   $("#ldEditBtn").classList.remove("hidden");
   $("#ldResearchBtn").classList.remove("hidden");
+  $("#ldApolloBtn").classList.remove("hidden");
   $("#ldPromoteBtn").classList.remove("hidden");
   $("#ldRejectBtn").classList.remove("hidden");
   $("#ldSaveBtn").classList.add("hidden");
@@ -1284,6 +1304,56 @@ async function requestLeadResearch() {
   }
 }
 $("#ldResearchBtn").addEventListener("click", requestLeadResearch);
+
+/* ---------- 名單 Apollo 請求 ---------- */
+let leadApollo = null; // 目前名單最新一筆 Apollo 請求
+function apolloStatusText(r) {
+  const d = r.status === "done" ? r.completed_at : r.status === "in_progress" ? r.started_at : r.requested_at;
+  const ds = d ? new Date(d).toLocaleString(lang === "en" ? "en-US" : "zh-TW") : "";
+  const key = { requested: "leadApolloRequestedAt", in_progress: "leadApolloInProgress", done: "leadApolloDone", failed: "leadApolloFailed" }[r.status] || "leadApolloRequestedAt";
+  return t(key).replace("{d}", ds);
+}
+function renderLeadApollo() {
+  const el = $("#ldApollo");
+  if (!leadApollo) { el.textContent = ""; $("#ldApolloBtn").disabled = false; return; }
+  el.textContent = t("leadApolloStatus").replace("{s}", apolloStatusText(leadApollo));
+  $("#ldApolloBtn").disabled = leadApollo.status === "requested" || leadApollo.status === "in_progress";
+}
+async function loadLeadApollo(l) {
+  leadApollo = null;
+  try {
+    const rows = await api.apolloRequests(l.id);
+    if (Array.isArray(rows) && rows.length) leadApollo = rows[0];
+  } catch (e) { leadApollo = null; }
+  if (currentLead && currentLead.id === l.id) renderLeadApollo();
+}
+let apolloRequesting = false;
+async function requestLeadApollo() {
+  const l = currentLead;
+  if (!l || apolloRequesting) return;
+  if (leadApollo && (leadApollo.status === "requested" || leadApollo.status === "in_progress")) return;
+  if (!confirm(t("leadApolloConfirm").replace("{b}", l.brand))) return;
+  apolloRequesting = true;
+  $("#ldApolloBtn").disabled = true;
+  const msg = $("#ldMsg");
+  try {
+    const rows = await api.addApolloRequest({
+      lead_id: l.id, brand: l.brand, domain: l.domain || null, status: "requested",
+      requested_by: session && session.user ? (session.user.email || session.user.id) : null,
+    });
+    leadApollo = Array.isArray(rows) ? rows[0] : rows;
+    renderLeadApollo();
+    msg.textContent = t("leadApolloRequested");
+    msg.className = "ok";
+  } catch (e) {
+    msg.textContent = t("leadApolloFail") + e.message;
+    msg.className = "err";
+    renderLeadApollo();
+  } finally {
+    apolloRequesting = false;
+  }
+}
+$("#ldApolloBtn").addEventListener("click", requestLeadApollo);
 
 /* ---------- 名單匯入（貼文字） ---------- */
 let importParsed = [];
