@@ -80,6 +80,12 @@ a{color:var(--accent)}
 .tabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .subitem{border:1px solid var(--line);border-radius:8px;padding:10px;margin:8px 0;font-size:14px;overflow-wrap:anywhere}
 .subitem .meta{color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+/* 產品與配方 */
+.fx{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0}
+.fx th,.fx td{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left;vertical-align:top}
+.fx th{color:var(--muted);font-size:12px}
+.fx td.num,.fx th.num{text-align:right;white-space:nowrap}
+.fximg{max-width:100%;height:auto;border:1px solid var(--line);border-radius:8px;margin-top:6px}
 /* 主畫面分頁（品牌主檔／名單池） */
 .viewtabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
 .viewtabs button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 18px;font-weight:700}
@@ -398,7 +404,13 @@ const I18N = {
     logTitle:"研究紀錄", logEmpty:"尚無研究紀錄。", logLoadFail:"研究紀錄載入失敗：",
     logConf:"信心度", logObserved:"觀察日", logSource:"來源", logEvidence:"證據",
     logApolloProfile:"Apollo 公司頁", logPending:"待審核", logApproved:"已核准",
-    logHeld:"暫扣", logRejected:"退回", logSuperseded:"已取代"
+    logHeld:"暫扣", logRejected:"退回", logSuperseded:"已取代",
+    formulaTitle:"產品與配方", formulaEmpty:"尚無產品與配方資料。", formulaLoadFail:"產品與配方載入失敗：",
+    formulaServing:"每份", formulaServings:"份數", formulaFlavors:"口味", formulaClaims:"宣稱", formulaCalories:"熱量",
+    formulaNutrition:"營養成分表", formulaIngredients:"成分表",
+    formulaColIngredient:"成分", formulaColForm:"形態", formulaColAmount:"每份含量", formulaColDv:"%DV",
+    labelTypeNutritionFacts:"營養成分表", labelTypeIngredients:"成分表", labelTypeFront:"包裝正面",
+    labelImgFail:"標籤圖載入失敗：", labelImgLoading:"標籤圖載入中…"
   },
   en: {
     appTitle:"AMI CRM — US Brand Development", logout:"Log out",
@@ -477,12 +489,18 @@ const I18N = {
     logTitle:"Research log", logEmpty:"No research records yet.", logLoadFail:"Failed to load research log: ",
     logConf:"Confidence", logObserved:"Observed", logSource:"Source", logEvidence:"Evidence",
     logApolloProfile:"Apollo company page", logPending:"Pending", logApproved:"Approved",
-    logHeld:"Held", logRejected:"Rejected", logSuperseded:"Superseded"
+    logHeld:"Held", logRejected:"Rejected", logSuperseded:"Superseded",
+    formulaTitle:"Products & Formulas", formulaEmpty:"No products or formula data yet.", formulaLoadFail:"Failed to load products & formulas: ",
+    formulaServing:"Serving", formulaServings:"Servings", formulaFlavors:"Flavors", formulaClaims:"Claims", formulaCalories:"Calories",
+    formulaNutrition:"Nutrition Facts", formulaIngredients:"Ingredients",
+    formulaColIngredient:"Ingredient", formulaColForm:"Form", formulaColAmount:"Amount per serving", formulaColDv:"%DV",
+    labelTypeNutritionFacts:"Nutrition Facts", labelTypeIngredients:"Ingredients", labelTypeFront:"Front of pack",
+    labelImgFail:"Failed to load label image: ", labelImgLoading:"Loading label image…"
   }
 };
 /* 欄位標籤（64 欄） */
 const FIELD_LABEL = {
-  id:["編號","ID"], name:["品牌","Brand"], domain:["網域","Domain"], format:["劑型","Format"],
+  id:["編號","ID"], name:["品牌","Brand"], domain:["網域","Domain"], amazon_store_url:["Amazon Store","Amazon Store"], format:["劑型","Format"],
   segment:["區隔","Segment"], market:["市場","Market"], factory:["工廠","Factory"],
   factory_note:["工廠備註","Factory note"], factory_url:["工廠來源","Factory source"],
   factory_checked:["工廠查核日","Factory checked"], parent_check:["母公司查核","Parent check"],
@@ -518,7 +536,7 @@ const FIELD_LABEL = {
   discovery_pid:["發現編號","Discovery PID"]
 };
 const FIELD_GROUPS = [
-  ["gBasic",["id","name","domain","format","segment","market","priority","stage","source","batch","screening","verification_version","verification_checked","review_cohort","created","discovery_pid"]],
+  ["gBasic",["id","name","domain","amazon_store_url","format","segment","market","priority","stage","source","batch","screening","verification_version","verification_checked","review_cohort","created","discovery_pid"]],
   ["gFactory",["factory","factory_note","factory_url","factory_checked","parent_check","parent_group","ownership_status","parent_note"]],
   ["gAds",["ad_status","ad_platform","ad_url","ad_id","ad_observed","ad_checked","google_status","google_url"]],
   ["gDemand",["demand_status","demand_note","demand_url","demand_source_date","demand_checked","procurement_confirmed","buyer_reply_url","buyer_reply_date","buyer_target","buyer_target_url"]],
@@ -605,7 +623,11 @@ const api = {
   researchLog: brandId => sb("/rest/v1/crm_research_log?brand_id=eq." + encodeURIComponent(brandId) + "&select=*&order=observed_at.desc,created_at.desc&limit=200", { headers: headers() }),
   researchLogAll: () => sb("/rest/v1/crm_research_log?select=*&order=created_at.desc&limit=1000", { headers: headers() }),
   researchRequestsAll: () => sb("/rest/v1/crm_research_requests?select=*&order=requested_at.desc&limit=100", { headers: headers() }),
-  apolloRequestsAll: () => sb("/rest/v1/crm_apollo_requests?select=*&order=requested_at.desc&limit=100", { headers: headers() })
+  apolloRequestsAll: () => sb("/rest/v1/crm_apollo_requests?select=*&order=requested_at.desc&limit=100", { headers: headers() }),
+  /* 產品與配方（crm_products／crm_formula_ingredients／crm_product_labels） */
+  productsByBrand: brandId => sb("/rest/v1/crm_products?brand_id=eq." + encodeURIComponent(brandId) + "&select=*&order=created_at.asc&limit=100", { headers: headers() }),
+  ingredientsByProduct: productId => sb("/rest/v1/crm_formula_ingredients?product_id=eq." + encodeURIComponent(productId) + "&select=*&order=sort_order.asc,created_at.asc&limit=500", { headers: headers() }),
+  labelsByProduct: productId => sb("/rest/v1/crm_product_labels?product_id=eq." + encodeURIComponent(productId) + "&select=*&order=created_at.asc&limit=50", { headers: headers() })
 };
 
 /* ---------- 語言 ---------- */
@@ -903,9 +925,16 @@ const domainLink = d => {
   const url = /^https?:\/\//i.test(d) ? d : "https://" + d;
   return `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(d)}</a>`;
 };
+/* Amazon Store 連結：顯示截斷後的網址（過長時…），title 保留完整網址 */
+const storeLink = u => {
+  if (!u) return "—";
+  const short = u.length > 60 ? u.slice(0, 60) + "…" : u;
+  return `<a href="${esc(u)}" target="_blank" rel="noopener" title="${esc(u)}">${esc(short)}</a>`;
+};
 function fieldVal(c, f) {
   const v = c[f];
   if (v == null || v === "") return "—";
+  if (f === "amazon_store_url") return storeLink(v);
   if (f === "domain") return domainLink(v);
   if (isUrl(v)) return `<a href="${esc(v)}" target="_blank" rel="noopener">${esc(v)}</a>`;
   return esc(v);
@@ -931,8 +960,9 @@ function renderDetail(c, keepTab) {
     fields.forEach(f => { html += `<dt>${esc(fl(f))}</dt><dd>${fieldVal(c, f)}</dd>`; });
     html += `</dl>`;
   });
-  $("#tab-info").innerHTML = html + `<h3>${esc(t("logTitle"))}</h3><div id="researchLog"></div>`;
+  $("#tab-info").innerHTML = html + `<h3>${esc(t("logTitle"))}</h3><div id="researchLog"></div><h3>${esc(t("formulaTitle"))}</h3><div id="formulaSection"></div>`;
   loadResearchLog(c.id, $("#researchLog"));
+  loadFormulaSection(c.id, $("#formulaSection"));
   document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === tab));
   ["info","contacts","deals","activities"].forEach(x => $("#tab-" + x).classList.toggle("hidden", x !== tab));
   if (tab !== "info") loadSubtab(tab);
@@ -1266,7 +1296,7 @@ function renderLeads() {
 }
 /* ---------- 名單明細 ---------- */
 const LEAD_FIELD_LABEL = {
-  brand: ["品牌", "Brand"], domain: ["網域", "Domain"], source: ["來源", "Source"],
+  brand: ["品牌", "Brand"], domain: ["網域", "Domain"], amazon_store_url: ["Amazon Store", "Amazon Store"], source: ["來源", "Source"],
   source_id: ["來源編號", "Source ID"], monthly_sales: ["月銷量", "Monthly sales"],
   monthly_revenue: ["月營收", "Monthly revenue"], revenue_band: ["營收級距", "Revenue band"],
   tier: ["級別", "Tier"], status: ["狀態", "Status"], dedupe_status: ["去重狀態", "Dedupe status"],
@@ -1283,6 +1313,7 @@ function leadFieldVal(l, f) {
   if (f === "monthly_sales") return esc(fmtInt(v));
   if (f === "status") return esc(leadStatusLabel(v));
   if (f === "domain") return domainLink(v);
+  if (f === "amazon_store_url") return storeLink(v);
   if (f === "matched_company_id") {
     const c = companies.find(x => x.id === v);
     return c ? esc(c.name) + "（" + domainLink(c.domain) + "）" : esc(String(v));
@@ -1314,7 +1345,7 @@ function openLeadDetail(l) {
     html += `<dt>${esc(label)}</dt><dd>${leadFieldVal(l, f)}</dd>`;
   });
   html += `</dl>`;
-  $("#ldBody").innerHTML = html + `<h3 style="margin-top:14px">${esc(t("logTitle"))}</h3><div id="ldResearchLog"></div>`;
+  $("#ldBody").innerHTML = html + `<h3 style="margin-top:14px">${esc(t("logTitle"))}</h3><div id="ldResearchLog"></div><h3 style="margin-top:14px">${esc(t("formulaTitle"))}</h3><div id="ldFormulaSection"></div>`;
   const done = l.status === "promoted" || l.status === "rejected";
   $("#ldPromoteBtn").disabled = done || leadBusy === l.id;
   $("#ldRejectBtn").disabled = done || leadBusy === l.id;
@@ -1325,6 +1356,7 @@ function openLeadDetail(l) {
   loadLeadResearch(l);
   loadLeadApollo(l);
   loadResearchLog(l.id, $("#ldResearchLog"));
+  loadFormulaSection(l.id, $("#ldFormulaSection"));
 }
 function closeLeadDetail() {
   $("#leadOverlay").classList.add("hidden");
@@ -1334,7 +1366,7 @@ function closeLeadDetail() {
 /* ---------- 名單編輯 ---------- */
 let leadEditing = false;
 const LEAD_EDIT_FIELDS = [
-  ["brand", "text"], ["domain", "text"], ["source", "text"], ["source_id", "text"],
+  ["brand", "text"], ["domain", "text"], ["amazon_store_url", "text"], ["source", "text"], ["source_id", "text"],
   ["monthly_sales", "number"], ["monthly_revenue", "number"],
   ["revenue_band", "select"], ["tier", "select"], ["status", "select"], ["dedupe_status", "select"], ["date_sc", "date"],
 ];
@@ -1360,7 +1392,7 @@ function enterLeadEdit() {
   LEAD_EDIT_FIELDS.forEach(([f, type]) => {
     const label = LEAD_FIELD_LABEL[f][lang === "en" ? 1 : 0];
     const v = l[f];
-    const full = (f === "brand" || f === "domain") ? " full" : "";
+    const full = (f === "brand" || f === "domain" || f === "amazon_store_url") ? " full" : "";
     html += `<div class="${full.trim()}"><label class="muted">${esc(label)}</label>`;
     const opts = leadEditOptions(f);
     if (opts) {
@@ -1496,6 +1528,131 @@ async function loadResearchLog(brandId, el) {
   } catch (e) {
     el.innerHTML = `<span class="err">${esc(t("logLoadFail"))}${esc(e.message)}</span>`;
   }
+}
+
+/* ---------- 產品與配方（crm_products／crm_formula_ingredients／crm_product_labels） ---------- */
+let labelObjectUrls = [];
+function revokeLabelUrls() {
+  labelObjectUrls.forEach(u => { try { URL.revokeObjectURL(u); } catch (e) {} });
+  labelObjectUrls = [];
+}
+/* product-labels 為私有桶：用登入者的 access token 打 authenticated 端點取 blob。
+   file_path 形如 product-labels/axocyne/xxx.png，端點路徑須去掉開頭的 product-labels/。 */
+function storageObjectUrl(filePath) {
+  const p = String(filePath || "").replace(/^product-labels\//, "");
+  return SB_URL + "/storage/v1/object/authenticated/product-labels/" + p.split("/").map(encodeURIComponent).join("/");
+}
+function labelTypeLabel(ty) {
+  return ty === "nutrition_facts" ? t("labelTypeNutritionFacts")
+    : ty === "ingredients" ? t("labelTypeIngredients")
+    : ty === "front" ? t("labelTypeFront") : (ty || "");
+}
+function fmtAmount(v, unit) {
+  if (v == null || v === "") return "—";
+  return Number(v) + (unit ? " " + unit : "");
+}
+function productMetaHtml(p) {
+  const rows = [];
+  if (p.serving_size) rows.push(`${esc(t("formulaServing"))}：${esc(p.serving_size)}`);
+  if (p.servings_per_container != null) rows.push(`${esc(t("formulaServings"))}：${esc(p.servings_per_container)}`);
+  if (p.calories != null) rows.push(`${esc(t("formulaCalories"))}：${esc(p.calories)}`);
+  if (p.flavors) rows.push(`${esc(t("formulaFlavors"))}：${esc(p.flavors)}`);
+  if (p.claims) rows.push(`${esc(t("formulaClaims"))}：${esc(p.claims)}`);
+  return rows.length ? `<div class="meta">${rows.join("<br>")}</div>` : "";
+}
+async function loadLabelImage(wrap, filePath) {
+  const ph = wrap.querySelector("[data-labph]");
+  try {
+    const res = await fetch(storageObjectUrl(filePath), { headers: headers() });
+    if (!res.ok) throw new Error(res.status + " " + res.statusText);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    labelObjectUrls.push(url);
+    const img = document.createElement("img");
+    img.className = "fximg";
+    img.alt = labelTypeLabel(wrap.dataset.labelType || "");
+    img.src = url;
+    if (ph) ph.replaceWith(img);
+    else wrap.appendChild(img);
+  } catch (e) {
+    /* 標籤圖取不到就明說載入失敗，絕不假裝無圖 */
+    if (ph) { ph.textContent = t("labelImgFail") + e.message; ph.className = "err"; }
+    else { const s = document.createElement("span"); s.className = "err"; s.textContent = t("labelImgFail") + e.message; wrap.appendChild(s); }
+  }
+}
+async function loadProductFormula(p, box) {
+  const ingBox = box.querySelector("[data-ing]");
+  const labBox = box.querySelector("[data-lab]");
+  let ings = null, labs = null, ingErr = null, labErr = null;
+  try { ings = await api.ingredientsByProduct(p.id); } catch (e) { ingErr = e; }
+  try { labs = await api.labelsByProduct(p.id); } catch (e) { labErr = e; }
+  if (ingBox) {
+    if (ingErr) {
+      ingBox.innerHTML = `<span class="err">${esc(t("loadFail"))}${esc(ingErr.message)}</span>`;
+    } else {
+      const rows = Array.isArray(ings) ? ings : [];
+      const nf = rows.filter(r => r.source === "nutrition_facts");
+      const il = rows.filter(r => r.source !== "nutrition_facts");
+      let h = "";
+      if (nf.length) {
+        h += `<div style="margin-top:6px"><b>${esc(t("formulaNutrition"))}</b></div>` +
+          `<table class="fx"><thead><tr><th>${esc(t("formulaColIngredient"))}</th><th>${esc(t("formulaColForm"))}</th><th class="num">${esc(t("formulaColAmount"))}</th><th class="num">${esc(t("formulaColDv"))}</th></tr></thead><tbody>` +
+          nf.map(r => `<tr><td>${esc(r.ingredient_name || "")}</td><td>${esc(r.ingredient_form || "—")}</td><td class="num">${esc(fmtAmount(r.amount_value, r.amount_unit))}</td><td class="num">${r.dv_pct == null ? "—" : esc(r.dv_pct) + "%"}</td></tr>`).join("") +
+          `</tbody></table>`;
+      }
+      if (il.length) {
+        h += `<div style="margin-top:6px"><b>${esc(t("formulaIngredients"))}</b></div>` +
+          `<div>${il.map(r => esc(r.ingredient_name || "")).filter(Boolean).join(" · ")}</div>`;
+      }
+      ingBox.innerHTML = h || `<span class="muted">${esc(t("formulaEmpty"))}</span>`;
+    }
+  }
+  if (labBox) {
+    if (labErr) {
+      labBox.innerHTML = `<span class="err">${esc(t("loadFail"))}${esc(labErr.message)}</span>`;
+    } else {
+      const rows = Array.isArray(labs) ? labs : [];
+      rows.forEach(lb => {
+        const wrap = document.createElement("div");
+        wrap.style.marginTop = "8px";
+        wrap.dataset.labelType = lb.label_type || "";
+        wrap.innerHTML = `<div class="meta">${esc(labelTypeLabel(lb.label_type))}</div><span class="muted" data-labph>${esc(t("labelImgLoading"))}</span>`;
+        labBox.appendChild(wrap);
+        loadLabelImage(wrap, lb.file_path);
+      });
+    }
+  }
+}
+async function loadFormulaSection(brandId, el) {
+  if (!el) return;
+  revokeLabelUrls();
+  el.innerHTML = `<span class="muted">${esc(t("loading"))}</span>`;
+  let products;
+  try {
+    products = await api.productsByBrand(brandId);
+  } catch (e) {
+    /* 表不存在或查詢失敗：顯示載入失敗，不謊稱尚無資料 */
+    el.innerHTML = `<span class="err">${esc(t("formulaLoadFail"))}${esc(e.message)}</span>`;
+    return;
+  }
+  if (!Array.isArray(products) || !products.length) {
+    el.innerHTML = `<div class="muted">${esc(t("formulaEmpty"))}</div>`;
+    return;
+  }
+  el.innerHTML = "";
+  products.forEach(p => {
+    const box = document.createElement("div");
+    box.className = "subitem";
+    box.dataset.product = p.id;
+    const asinLink = p.asin ? `<a href="https://www.amazon.com/dp/${esc(p.asin)}" target="_blank" rel="noopener">ASIN ${esc(p.asin)}</a>` : "";
+    box.innerHTML =
+      `<b>${esc(p.product_name || t("untitled"))}</b>${asinLink ? " · " + asinLink : ""}` +
+      productMetaHtml(p) +
+      `<div data-ing style="margin-top:8px"><span class="muted">${esc(t("loading"))}</span></div>` +
+      `<div data-lab style="margin-top:8px"></div>`;
+    el.appendChild(box);
+    loadProductFormula(p, box);
+  });
 }
 let researchRequesting = false;
 async function requestLeadResearch() {
