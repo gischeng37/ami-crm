@@ -90,6 +90,16 @@ a{color:var(--accent)}
 .fxhead{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:14px 0 8px}
 .fxhead h3{flex:1;margin:0}
 /* 主畫面分頁（品牌主檔／名單池） */
+/* 補齊缺口（backfill Phase 1）：維度卡可點選（最多 2 個維度），缺口清單勾選建批 */
+.bfgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.bfcard{border:1px solid var(--line);background:#fff;border-radius:8px;padding:10px 12px;text-align:left;cursor:pointer}
+.bfcard b{display:block;font-size:15px}
+.bfcard span{font-size:13px;color:var(--muted)}
+.bfcard.on{border-color:var(--accent);background:#eaf4fa;box-shadow:0 0 0 1px var(--accent)}
+.bflist{display:flex;gap:8px;align-items:flex-start;padding:8px;border-top:1px solid var(--line);cursor:pointer}
+.bflist input[type=checkbox]{width:auto;margin-top:4px;flex:none}
+.bflist .tag{margin-left:4px}
+.row .nm,.lrow .nm{user-select:none}
 .viewtabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
 .viewtabs button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 18px;font-weight:700}
 .viewtabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
@@ -132,6 +142,7 @@ a{color:var(--accent)}
   .lfilters{grid-template-columns:1fr}
   .panel{padding:14px}
   .stat b{font-size:19px}
+  .bfgrid{grid-template-columns:1fr 1fr}
 }
 </style>
 </head>
@@ -184,6 +195,27 @@ a{color:var(--accent)}
     </div>
     <div id="dashboardView">
       <div class="card"><div id="dashStats" class="stats"></div></div>
+      <div class="card" id="bfCard">
+        <h3 data-i18n="bfTitle">補齊缺口</h3>
+        <p class="muted" data-i18n="bfHint">新功能上線後留下的空白，由此手動建立補齊批次。只建立研究請求，不自動研究、不自動寫入。</p>
+        <div id="bfDims" class="bfgrid"><span class="muted" data-i18n="loading">載入中…</span></div>
+        <div id="bfListWrap" class="hidden">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0">
+            <button id="bfFirstBatchBtn" class="btn ghost small" type="button" data-i18n="bfFirstBatch">首批：Store × 已晉升 16 家</button>
+            <button id="bfSelectAllBtn" class="btn ghost small" type="button" data-i18n="bfSelectAll">全選</button>
+            <button id="bfClearBtn" class="btn ghost small" type="button" data-i18n="bfClear">清除</button>
+            <span id="bfSelCount" class="muted"></span>
+          </div>
+          <p class="muted" data-i18n="bfScopeNote">補齊只做 USA、Canada 品牌（依研究範圍規則）；其他國家只留池、不研究。</p>
+          <div id="bfList"></div>
+          <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button id="bfCreateBtn" class="btn" type="button" data-i18n="bfCreateBatch">建立補齊批次</button>
+            <span id="bfMsg" class="err"></span>
+          </div>
+        </div>
+        <h3 style="margin-top:16px" data-i18n="bfQueue">補齊批次佇列</h3>
+        <div id="bfQueue"><span class="muted" data-i18n="loading">載入中…</span></div>
+      </div>
       <div class="card"><h3 data-i18n="dashQueue">待辦佇列</h3><div id="dashQueue"><span class="muted">載入中…</span></div></div>
       <div class="card"><h3 data-i18n="dashFunnel">開發漏斗</h3><div id="dashFunnel"></div></div>
       <div class="card"><h3 data-i18n="dashRecent">最新研究紀錄</h3><div id="dashRecent"></div></div>
@@ -424,7 +456,24 @@ const I18N = {
     cmpProduct:"產品",
     exportXlsx:"匯出 Excel", exporting:"匯出中…", exportFail:"匯出失敗：", exportNoData:"沒有可匯出的配方資料。",
     sheetProducts:"產品總表", formulaColCategory:"類別", formulaColSource:"來源",
-    formulaColAmountValue:"含量", formulaColUnit:"單位", formulaColStore:"Amazon Store"
+    formulaColAmountValue:"含量", formulaColUnit:"單位", formulaColStore:"Amazon Store",
+    /* 補齊缺口（backfill Phase 1） */
+    bfTitle:"補齊缺口", bfHint:"新功能上線後留下的空白，由此手動建立補齊批次。只建立研究請求，不自動研究、不自動寫入。",
+    bfDimStore:"Amazon Store", bfDimChannels:"社群頻道", bfDimFormula:"配方", bfDimReviews:"評價", bfDimSignals:"Reddit 訊號", bfDimResearch:"研究三欄",
+    bfMissingC:"主檔缺 {n} 家", bfMissingL:"名單缺 {n} 筆",
+    bfFirstBatch:"首批：Store × 已晉升 16 家", bfSelectAll:"全選", bfClear:"清除", bfSelected:"已選 {n} 家",
+    bfScopeNote:"補齊只做 USA、Canada 品牌（依研究範圍規則）；其他國家只留池、不研究。",
+    bfCreateBatch:"建立補齊批次", bfNeedDim:"請先點選上方維度卡片（1–2 個）。", bfMaxDims:"一次最多選 2 個維度。",
+    bfNeedBrands:"請勾選品牌（1–16 家）。", bfTooMany:"一批最多 16 家，請拆成多批。",
+    bfFewConfirm:"本批只有 {n} 家（建議 10–16 家），確定建立？",
+    bfCreateConfirm:"確定建立補齊批次（{n} 家，維度：{dims}）？只會建立研究請求，不會自動研究或寫入。",
+    bfCreated:"補齊批次已建立：{n} 家（{tag}）。", bfCreateFail:"建立失敗：",
+    bfQueue:"補齊批次佇列", bfQueueEmpty:"尚無補齊批次。", bfQueueBrands:"{n} 家",
+    bfQueueDone:"完成 {n}", bfQueueFailed:"失敗 {n}", bfNoGap:"這個維度沒有待補品牌。",
+    bfLoading:"計算缺口中…", bfLoadFail:"缺口計算失敗：",
+    bfKindCompany:"主檔", bfKindLead:"名單", bfMissingWhat:"缺：{dims}",
+    googleSearch:"Google 搜尋",
+    domainOverwriteConfirm:"網域已有值「{old}」，確定覆寫為「{new}」？"
   },
   en: {
     appTitle:"AMI CRM — US Brand Development", logout:"Log out",
@@ -520,7 +569,24 @@ const I18N = {
     cmpProduct:"Product",
     exportXlsx:"Export Excel", exporting:"Exporting…", exportFail:"Export failed: ", exportNoData:"No formula data to export.",
     sheetProducts:"Products", formulaColCategory:"Category", formulaColSource:"Source",
-    formulaColAmountValue:"Amount", formulaColUnit:"Unit", formulaColStore:"Amazon Store"
+    formulaColAmountValue:"Amount", formulaColUnit:"Unit", formulaColStore:"Amazon Store",
+    /* Backfill gaps (Phase 1) */
+    bfTitle:"Backfill gaps", bfHint:"Gaps left by new features. Build a backfill batch manually from here — it only creates research requests, never researches or writes automatically.",
+    bfDimStore:"Amazon Store", bfDimChannels:"Social channels", bfDimFormula:"Formulas", bfDimReviews:"Reviews", bfDimSignals:"Reddit signals", bfDimResearch:"Research (3 fields)",
+    bfMissingC:"{n} companies missing", bfMissingL:"{n} leads missing",
+    bfFirstBatch:"First batch: Store × 16 promoted", bfSelectAll:"Select all", bfClear:"Clear", bfSelected:"{n} selected",
+    bfScopeNote:"Backfill covers USA and Canada brands only (research scope rule); other countries stay in the pool, unresearched.",
+    bfCreateBatch:"Create backfill batch", bfNeedDim:"Pick a dimension card above first (1–2).", bfMaxDims:"At most 2 dimensions per batch.",
+    bfNeedBrands:"Pick brands first (1–16).", bfTooMany:"At most 16 brands per batch — split into more batches.",
+    bfFewConfirm:"This batch has only {n} brands (10–16 recommended). Create it anyway?",
+    bfCreateConfirm:"Create a backfill batch ({n} brands, dimensions: {dims})? It only creates research requests — nothing is researched or written automatically.",
+    bfCreated:"Backfill batch created: {n} brands ({tag}).", bfCreateFail:"Failed to create batch: ",
+    bfQueue:"Backfill batch queue", bfQueueEmpty:"No backfill batches yet.", bfQueueBrands:"{n} brands",
+    bfQueueDone:"done {n}", bfQueueFailed:"failed {n}", bfNoGap:"No brands are missing in this dimension.",
+    bfLoading:"Computing gaps…", bfLoadFail:"Failed to compute gaps: ",
+    bfKindCompany:"Company", bfKindLead:"Lead", bfMissingWhat:"Missing: {dims}",
+    googleSearch:"Google search",
+    domainOverwriteConfirm:"Domain already has “{old}”. Overwrite it with “{new}”?"
   }
 };
 /* 欄位標籤（64 欄） */
@@ -611,6 +677,10 @@ const fl = f => (FIELD_LABEL[f] ? FIELD_LABEL[f][lang === "en" ? 1 : 0] : f);
 const stageLabel = s => (STAGE_LABEL[s] ? STAGE_LABEL[s][lang === "en" ? 1 : 0] : s);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const isUrl = s => typeof s === "string" && /^https?:\/\//i.test(s.trim());
+/* 雙擊品牌名：在新分頁開 Google 搜尋該品牌名（Jack 2026-11-15 定） */
+function googleSearch(name) {
+  window.open("https://www.google.com/search?q=" + encodeURIComponent(name || ""), "_blank", "noopener");
+}
 
 /* ---------- API ---------- */
 function headers(json) {
@@ -659,6 +729,10 @@ const api = {
   reviewsByBrand: brandId => sb("/rest/v1/crm_reviews?brand_id=eq." + encodeURIComponent(brandId) + "&select=*&order=observed_at.desc,created_at.desc&limit=200", { headers: headers() }),
   /* Reddit 訊號（crm_signals） */
   signalsByBrand: brandId => sb("/rest/v1/crm_signals?brand_id=eq." + encodeURIComponent(brandId) + "&select=*&order=observed_at.desc,created_at.desc&limit=200", { headers: headers() }),
+  /* 補齊缺口統計：只拉 brand_id 集合，前端做差集（設計 §4；名單未破 5,000 筆前不走 RPC） */
+  productsAll: () => sb("/rest/v1/crm_products?select=brand_id&limit=1000", { headers: headers() }),
+  reviewsAll: () => sb("/rest/v1/crm_reviews?select=brand_id&limit=1000", { headers: headers() }),
+  signalsRedditAll: () => sb("/rest/v1/crm_signals?source=eq.reddit&select=brand_id&limit=1000", { headers: headers() }),
 };
 
 /* ---------- 語言 ---------- */
@@ -879,7 +953,19 @@ function renderList() {
       `<span>${esc(stageLabel(c.stage || ""))}${c.research_status === "done" ? ` <span class="tag green">${esc(t("researchDone"))}</span>` : ""}</span>` +
       `<span>${esc(c.factory || "")}</span>` +
       `<span class="dm">${esc(c.contact || "")}</span>`;
-    d.addEventListener("click", e => { if (e.target.closest("a")) return; openDetail(c); });
+    /* 單擊開明細；雙擊品牌名開 Google 搜尋（須延遲 250ms 區分，雙擊時取消明細） */
+    let clickTimer = null;
+    d.addEventListener("click", e => {
+      if (e.target.closest("a")) return;
+      if (clickTimer) return;
+      clickTimer = setTimeout(() => { clickTimer = null; openDetail(c); }, 250);
+    });
+    const nm = d.querySelector(".nm");
+    if (nm) nm.addEventListener("dblclick", e => {
+      e.stopPropagation();
+      if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
+      googleSearch(c.name);
+    });
     box.appendChild(d);
   });
   renderPager($("#pager"), listPage, totalPages, list.length, start, PAGE_SIZE, p => { listPage = p; renderList(); });
@@ -1193,6 +1279,202 @@ function funnelRow(label, n, max) {
   return `<div style="margin:8px 0"><div style="display:flex;justify-content:space-between"><span>${esc(label)}</span><b>${n}</b></div>
     <div style="height:10px;background:#e8eef2;border-radius:99px;margin-top:4px"><div style="height:10px;width:${pct}%;background:var(--accent);border-radius:99px"></div></div></div>`;
 }
+/* ---------- 補齊觸發機制 Phase 1（設計 v1.0；鐵律：只建請求，不自動研究／寫入） ---------- */
+let dashCache = null; /* 儀表板重新整理按鈕用；缺口統計每次即時重算，不另存快照 */
+const BF_DIMS = ["store", "channels", "formula", "reviews", "signals", "research"];
+const BF_DIM_LABEL = { store: "bfDimStore", channels: "bfDimChannels", formula: "bfDimFormula", reviews: "bfDimReviews", signals: "bfDimSignals", research: "bfDimResearch" };
+/* 首批範圍（backfill-progress.md）：Store 維度 × 已晉升 16 家 */
+const BF_FIRST_BATCH_IDS = ["elc-nuun", "elc-trevi", "elc-redmond", "elc-instant-hydration", "elc-sqwincher", "elc-salud", "elc-electrolit", "elc-fire-salt", "elc-drywater", "elc-hydromate", "elc-boobie", "elc-aibiodi", "elc-buoy", "elc-waterboy", "elc-celsius", "elc-magna"];
+let bfGaps = null;
+let bfGapErr = null;
+let bfSelectedDims = new Set();
+let bfSelectedBrands = new Map(); /* key `${kind}:${id}` -> {id, name, kind, domain} */
+let bfReqRowsCache = [];
+let bfPendingMsg = null;
+const bfIsEmpty = v => v == null || String(v).trim() === "";
+/* 缺口定義（設計 §3）：空值一律 coalesce(col,'')='' 判定，'' 與 NULL 都算缺。
+   名單無 factory／market／contact 欄位，研究三欄缺口以 research_status !== 'done' 計。 */
+function bfComputeGaps(prodIds, revIds, sigIds) {
+  const gaps = {};
+  BF_DIMS.forEach(d => { gaps[d] = { companies: [], leads: [] }; });
+  const checkBrand = (b, kind) => {
+    const missing = [];
+    if (bfIsEmpty(b.amazon_store_url)) missing.push("store");
+    if (["linkedin_url", "instagram_url", "tiktok_url", "facebook_url"].some(f => bfIsEmpty(b[f]))) missing.push("channels");
+    if (!prodIds.has(b.id)) missing.push("formula");
+    if (!revIds.has(b.id)) missing.push("reviews");
+    if (!sigIds.has(b.id)) missing.push("signals");
+    if (b.research_status !== "done") missing.push("research");
+    missing.forEach(d => gaps[d][kind === "company" ? "companies" : "leads"].push({ id: b.id, name: kind === "company" ? b.name : b.brand, kind, domain: b.domain || null }));
+  };
+  companies.forEach(c => checkBrand(c, "company"));
+  leads.forEach(l => checkBrand(l, "lead"));
+  return gaps;
+}
+function renderBfDims() {
+  const el = $("#bfDims");
+  if (!el) return;
+  if (bfGapErr) { el.innerHTML = `<span class="err">${esc(t("bfLoadFail"))}${esc(bfGapErr)}</span>`; return; }
+  if (!bfGaps) { el.innerHTML = `<span class="muted">${esc(t("bfLoading"))}</span>`; return; }
+  el.innerHTML = BF_DIMS.map(d => {
+    const g = bfGaps[d];
+    const on = bfSelectedDims.has(d);
+    return `<button type="button" class="bfcard${on ? " on" : ""}" data-bfdim="${d}"><b>${esc(t(BF_DIM_LABEL[d]))}</b><span>${esc(t("bfMissingC").replace("{n}", g.companies.length))} · ${esc(t("bfMissingL").replace("{n}", g.leads.length))}</span></button>`;
+  }).join("");
+  el.querySelectorAll("[data-bfdim]").forEach(b => b.addEventListener("click", () => {
+    const d = b.dataset.bfdim;
+    if (bfSelectedDims.has(d)) bfSelectedDims.delete(d);
+    else if (bfSelectedDims.size >= 2) {
+      const m = $("#bfMsg");
+      if (m) { m.textContent = t("bfMaxDims"); m.className = "err"; }
+    } else bfSelectedDims.add(d);
+    renderBfDims(); renderBfList();
+  }));
+}
+/* 待補清單＝已選維度的缺口聯集（同一品牌缺多維度只列一次） */
+function bfGapListItems() {
+  const items = new Map();
+  bfSelectedDims.forEach(d => {
+    ["companies", "leads"].forEach(k => {
+      (bfGaps[d][k] || []).forEach(b => {
+        const key = b.kind + ":" + b.id;
+        if (!items.has(key)) items.set(key, { ...b, missing: [] });
+        items.get(key).missing.push(d);
+      });
+    });
+  });
+  return [...items.values()].sort((a, b) => (a.kind === b.kind ? (a.name || "").localeCompare(b.name || "") : a.kind === "company" ? -1 : 1));
+}
+function updateBfSelCount() {
+  const el = $("#bfSelCount");
+  if (el) el.textContent = t("bfSelected").replace("{n}", bfSelectedBrands.size);
+}
+function renderBfList() {
+  const wrap = $("#bfListWrap"), listEl = $("#bfList");
+  if (!wrap || !listEl) return;
+  wrap.classList.toggle("hidden", !bfGaps);
+  if (!bfGaps) return;
+  if (!bfSelectedDims.size) {
+    listEl.innerHTML = `<div class="muted">${esc(t("bfNeedDim"))}</div>`;
+    updateBfSelCount();
+    return;
+  }
+  const items = bfGapListItems();
+  if (!items.length) {
+    listEl.innerHTML = `<div class="muted">${esc(t("bfNoGap"))}</div>`;
+    updateBfSelCount();
+    return;
+  }
+  listEl.innerHTML = items.map(b => {
+    const key = b.kind + ":" + b.id;
+    const checked = bfSelectedBrands.has(key) ? " checked" : "";
+    const miss = b.missing.map(d => t(BF_DIM_LABEL[d])).join("、");
+    return `<label class="bflist"><input type="checkbox" data-bfbrand="${esc(key)}"${checked}><span><b>${esc(b.name || t("untitled"))}</b> <span class="tag ${b.kind === "company" ? "b" : ""}">${esc(t(b.kind === "company" ? "bfKindCompany" : "bfKindLead"))}</span> <span class="muted">${esc(t("bfMissingWhat").replace("{dims}", miss))}</span></span></label>`;
+  }).join("");
+  listEl.querySelectorAll("[data-bfbrand]").forEach(cb => cb.addEventListener("change", () => {
+    const key = cb.dataset.bfbrand;
+    if (cb.checked) {
+      const sep = key.indexOf(":");
+      const kind = key.slice(0, sep), id = key.slice(sep + 1);
+      const item = bfGapListItems().find(x => x.kind === kind && x.id === id);
+      if (item) bfSelectedBrands.set(key, item);
+    } else bfSelectedBrands.delete(key);
+    updateBfSelCount();
+  }));
+  updateBfSelCount();
+}
+/* 批次佇列：按 note 標籤第一個 token（backfill:<維度>:<日期>:<序號>）彙總請求列 */
+function renderBfQueue(reqRows) {
+  const el = $("#bfQueue");
+  if (!el) return;
+  const groups = {};
+  (reqRows || []).forEach(r => {
+    const note = String(r.note || "");
+    if (!note.startsWith("backfill:")) return;
+    const tag = note.split(" ")[0];
+    (groups[tag] = groups[tag] || []).push(r);
+  });
+  const tags = Object.keys(groups).sort().reverse();
+  if (!tags.length) { el.innerHTML = `<div class="muted">${esc(t("bfQueueEmpty"))}</div>`; return; }
+  el.innerHTML = tags.map(tag => {
+    const rows = groups[tag];
+    const done = rows.filter(r => r.status === "done").length;
+    const failed = rows.filter(r => r.status === "failed").length;
+    const running = rows.filter(r => r.status === "requested" || r.status === "in_progress").length;
+    const dim = tag.split(":")[1] || "";
+    const dimLabel = BF_DIM_LABEL[dim] ? t(BF_DIM_LABEL[dim]) : dim;
+    return `<div class="subitem"><b>${esc(tag)}</b> · ${esc(dimLabel)} · ${esc(t("bfQueueBrands").replace("{n}", rows.length))} · ${esc(t("dashResearchRunning"))} ${running} · ${esc(t("bfQueueDone").replace("{n}", done))} · ${esc(t("bfQueueFailed").replace("{n}", failed))}<br>` +
+      rows.map(r => `<span class="tag ${r.status === "done" ? "green" : r.status === "failed" ? "grey" : "b"}" data-brand="${esc(r.lead_id)}" style="cursor:pointer;margin:2px 2px 0 0">${esc(r.brand || brandNameById(r.lead_id))}</span>`).join("") +
+      `</div>`;
+  }).join("");
+  el.querySelectorAll("[data-brand]").forEach(s => s.addEventListener("click", () => openBrandById(s.dataset.brand)));
+}
+function bfTodayStr() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+function bfNextSeq(dim, date, rows) {
+  const re = new RegExp(`^backfill:${dim.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}:${date}:([a-z])$`);
+  let max = 0;
+  (rows || []).forEach(r => {
+    const tag = String(r.note || "").split(" ")[0];
+    const m = tag.match(re);
+    if (m) max = Math.max(max, m[1].charCodeAt(0) - 96);
+  });
+  return String.fromCharCode(97 + max);
+}
+async function createBfBatch() {
+  const msg = $("#bfMsg");
+  msg.textContent = ""; msg.className = "err";
+  const brands = [...bfSelectedBrands.values()];
+  const dims = [...bfSelectedDims];
+  if (!dims.length) { msg.textContent = t("bfNeedDim"); return; }
+  if (!brands.length) { msg.textContent = t("bfNeedBrands"); return; }
+  if (brands.length > 16) { msg.textContent = t("bfTooMany"); return; }
+  const dimLabel = dims.map(d => t(BF_DIM_LABEL[d])).join("、");
+  if (brands.length < 10 && !confirm(t("bfFewConfirm").replace("{n}", brands.length))) return;
+  if (!confirm(t("bfCreateConfirm").replace("{n}", brands.length).replace("{dims}", dimLabel))) return;
+  const date = bfTodayStr();
+  const tag = `backfill:${dims[0]}:${date}:${bfNextSeq(dims[0], date, bfReqRowsCache)}`;
+  const note = dims.length > 1 ? tag + " + " + dims[1] : tag;
+  const btn = $("#bfCreateBtn");
+  btn.disabled = true;
+  btn.textContent = t("loading");
+  try {
+    const by = session && session.user ? (session.user.email || session.user.id) : null;
+    for (const b of brands) {
+      await api.addResearchRequest({ lead_id: b.id, brand: b.name, domain: b.domain || null, status: "requested", requested_by: by, note });
+    }
+    bfSelectedDims = new Set();
+    bfSelectedBrands = new Map();
+    bfPendingMsg = t("bfCreated").replace("{n}", brands.length).replace("{tag}", tag);
+    renderDashboard();
+  } catch (e) {
+    msg.textContent = t("bfCreateFail") + e.message;
+    msg.className = "err";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = t("bfCreateBatch");
+  }
+}
+/* 靜態按鈕接線（儀表板卡片為靜態 HTML，renderDashboard 不重建，監聽只掛一次） */
+$("#bfFirstBatchBtn").addEventListener("click", () => {
+  bfSelectedDims = new Set(["store"]);
+  renderBfDims(); renderBfList();
+  bfGapListItems().forEach(b => { if (BF_FIRST_BATCH_IDS.includes(b.id)) bfSelectedBrands.set(b.kind + ":" + b.id, b); });
+  renderBfList();
+});
+$("#bfSelectAllBtn").addEventListener("click", () => {
+  bfGapListItems().forEach(b => bfSelectedBrands.set(b.kind + ":" + b.id, b));
+  renderBfList();
+});
+$("#bfClearBtn").addEventListener("click", () => {
+  bfSelectedBrands = new Map();
+  renderBfList();
+});
+$("#bfCreateBtn").addEventListener("click", createBfBatch);
+
 async function renderDashboard() {
   const statsEl = $("#dashStats"), queueEl = $("#dashQueue"), funnelEl = $("#dashFunnel"), recentEl = $("#dashRecent"), metaEl = $("#dashMeta");
   if (!statsEl) return;
@@ -1233,6 +1515,17 @@ async function renderDashboard() {
   let reqRows = [], apRows = [];
   try { reqRows = await api.researchRequestsAll(); } catch (e) { reqRows = []; }
   try { apRows = await api.apolloRequestsAll(); } catch (e) { apRows = []; }
+  /* 補齊缺口：即時計算（不存快照）；失敗只影響補齊區，不擋儀表板其餘內容 */
+  bfReqRowsCache = reqRows;
+  try {
+    const [prods, revs, sigs] = await Promise.all([api.productsAll(), api.reviewsAll(), api.signalsRedditAll()]);
+    bfGaps = bfComputeGaps(
+      new Set((prods || []).map(r => r.brand_id)),
+      new Set((revs || []).map(r => r.brand_id)),
+      new Set((sigs || []).map(r => r.brand_id)));
+    bfGapErr = null;
+  } catch (e) { bfGapErr = e.message; bfGaps = null; }
+  renderBfDims(); renderBfList(); renderBfQueue(reqRows);
   const pending = logErr ? [] : (logRows || []).filter(r => r.status === "pending");
   const apRunning = apRows.filter(r => r.status === "requested" || r.status === "in_progress").length;
   const reqRunning = reqRows.filter(r => r.status === "requested" || r.status === "in_progress");
@@ -1263,6 +1556,7 @@ async function renderDashboard() {
     recentEl.innerHTML = recent.length ? recent.map(r => `<div class="subitem" data-brand="${esc(r.brand_id)}" style="cursor:pointer"><b>${esc(brandNameById(r.brand_id))}</b> · ${esc(logFieldLabel(r.field))} ${logStatusTag(r.status)}<br>${logValueHtml(r)}<br><span class="meta">${esc(r.observed_at || "")}${r.source_ref ? " · " + esc(r.source_ref) : ""}</span></div>`).join("") : `<div class="muted">${esc(t("logEmpty"))}</div>`;
   }
   metaEl.textContent = `${t("dashDataStatus") || ""} ${companies.length} / ${leadTotal == null ? "…" : leadTotal} / ${logErr ? "—" : (logRows || []).length} · ${new Date().toLocaleString(lang === "en" ? "en-US" : "zh-TW")}`;
+  if (bfPendingMsg) { const m = $("#bfMsg"); if (m) { m.textContent = bfPendingMsg; m.className = "ok"; } bfPendingMsg = null; }
   if (!leadsLoaded) loadLeads();
 }
 $("#dashQueue").addEventListener("click", e => {
@@ -1325,7 +1619,19 @@ function renderLeads() {
       `</span>`;
     d.querySelector("[data-promote]").addEventListener("click", e => { e.stopPropagation(); promoteLead(l); });
     d.querySelector("[data-reject]").addEventListener("click", e => { e.stopPropagation(); rejectLead(l); });
-    d.addEventListener("click", e => { if (e.target.closest("a")) return; openLeadDetail(l); });
+    /* 單擊開明細；雙擊品牌名開 Google 搜尋（須延遲 250ms 區分，雙擊時取消明細） */
+    let clickTimer = null;
+    d.addEventListener("click", e => {
+      if (e.target.closest("a")) return;
+      if (clickTimer) return;
+      clickTimer = setTimeout(() => { clickTimer = null; openLeadDetail(l); }, 250);
+    });
+    const nm = d.querySelector(".nm");
+    if (nm) nm.addEventListener("dblclick", e => {
+      e.stopPropagation();
+      if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
+      googleSearch(l.brand);
+    });
     box.appendChild(d);
   });
   renderPager($("#leadPager"), leadPage, totalPages, list.length, start, LEAD_PAGE_SIZE, p => { leadPage = p; renderLeads(); });
@@ -1447,10 +1753,14 @@ function enterLeadEdit() {
     } else {
       html += `<input id="le_${f}" type="text" value="${esc(v == null ? "" : v)}">`;
     }
+    /* 網域欄位旁的 Google 搜尋按鈕（手機版觸控入口；找到官網後貼回本欄位儲存） */
+    if (f === "domain") html += `<button type="button" class="btn ghost small" id="le_domain_search" style="margin-top:6px">${esc(t("googleSearch"))}</button>`;
     html += `</div>`;
   });
   html += `</div>`;
   $("#ldEditBody").innerHTML = html;
+  const dsBtn = document.getElementById("le_domain_search");
+  if (dsBtn) dsBtn.addEventListener("click", () => googleSearch(l.brand));
   $("#ldEditBody").classList.remove("hidden");
   $("#ldBody").classList.add("hidden");
   $("#ldEditBtn").classList.add("hidden");
@@ -1496,6 +1806,12 @@ async function saveLeadEdit() {
     }
   }
   if (!body.brand) { msg.textContent = t("leadBrandRequired"); msg.className = "err"; return; }
+  /* 網域回填規則：欄位為空才直接寫入；已有不同值時先問，確認才覆寫（coalesce guard 的 UI 版） */
+  const origDomain = (l.domain || "").trim();
+  const newDomain = body.domain == null ? "" : String(body.domain).trim();
+  if (origDomain && newDomain && origDomain.toLowerCase() !== newDomain.toLowerCase()) {
+    if (!confirm(t("domainOverwriteConfirm").replace("{old}", origDomain).replace("{new}", newDomain))) return;
+  }
   msg.textContent = "";
   try {
     await api.patchLead(l.id, body);
