@@ -86,6 +86,9 @@ a{color:var(--accent)}
 .fx th{color:var(--muted);font-size:12px}
 .fx td.num,.fx th.num{text-align:right;white-space:nowrap}
 .fximg{max-width:100%;height:auto;border:1px solid var(--line);border-radius:8px;margin-top:6px}
+/* 配方區標題列：標題＋匯出按鈕同列，手機寬度按鈕自動換行 */
+.fxhead{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:14px 0 8px}
+.fxhead h3{flex:1;margin:0}
 .cmpwrap{overflow-x:auto}
 .cmpwrap .fx{min-width:560px}
 /* 主畫面分頁（品牌主檔／名單池） */
@@ -262,7 +265,10 @@ a{color:var(--accent)}
       <div class="card">
         <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap">
           <b data-i18n="cmpTitle">配方對比</b>
-          <button id="cmpBtn" class="btn small" type="button" data-i18n="cmpCompare">對比</button>
+          <span style="display:flex;gap:8px;flex-wrap:wrap">
+            <button id="cmpBtn" class="btn small" type="button" data-i18n="cmpCompare">對比</button>
+            <button id="cmpExportBtn" class="btn ghost small" type="button" data-i18n="exportXlsx">匯出 Excel</button>
+          </span>
         </div>
         <p class="muted" data-i18n="cmpHint">勾選 2–4 個產品，按「對比」產生對比表。</p>
         <div id="cmpList"><span class="muted">載入中…</span></div>
@@ -438,7 +444,10 @@ const I18N = {
     cmpCompare:"對比", cmpMin:"請至少勾選 2 個產品。", cmpMax:"最多勾選 4 個產品。",
     cmpLoadFail:"產品載入失敗：", cmpEmpty:"尚無產品資料。",
     cmpNutrients:"營養素對比", cmpOverlap:"成分重疊", cmpCommon:"共有成分", cmpUnique:"獨有成分",
-    cmpNoNutrients:"無營養素數據（專有混合配方）", cmpProduct:"產品", cmpBrand:"品牌"
+    cmpNoNutrients:"無營養素數據（專有混合配方）", cmpProduct:"產品", cmpBrand:"品牌",
+    exportXlsx:"匯出 Excel", exporting:"匯出中…", exportFail:"匯出失敗：", exportNoData:"沒有可匯出的配方資料。",
+    sheetProducts:"產品總表", formulaColCategory:"類別", formulaColSource:"來源",
+    formulaColAmountValue:"含量", formulaColUnit:"單位", formulaColStore:"Amazon Store"
   },
   en: {
     appTitle:"AMI CRM — US Brand Development", logout:"Log out",
@@ -535,7 +544,10 @@ const I18N = {
     cmpCompare:"Compare", cmpMin:"Select at least 2 products.", cmpMax:"Select at most 4 products.",
     cmpLoadFail:"Failed to load products: ", cmpEmpty:"No products yet.",
     cmpNutrients:"Nutrient comparison", cmpOverlap:"Ingredient overlap", cmpCommon:"Shared ingredients", cmpUnique:"Unique ingredients",
-    cmpNoNutrients:"No nutrition data (proprietary blend)", cmpProduct:"Product", cmpBrand:"Brand"
+    cmpNoNutrients:"No nutrition data (proprietary blend)", cmpProduct:"Product", cmpBrand:"Brand",
+    exportXlsx:"Export Excel", exporting:"Exporting…", exportFail:"Export failed: ", exportNoData:"No formula data to export.",
+    sheetProducts:"Products", formulaColCategory:"Category", formulaColSource:"Source",
+    formulaColAmountValue:"Amount", formulaColUnit:"Unit", formulaColStore:"Amazon Store"
   }
 };
 /* 欄位標籤（64 欄） */
@@ -1010,9 +1022,11 @@ function renderDetail(c, keepTab) {
     fields.forEach(f => { html += `<dt>${esc(fl(f))}</dt><dd>${fieldVal(c, f)}</dd>`; });
     html += `</dl>`;
   });
-  $("#tab-info").innerHTML = html + `<h3>${esc(t("logTitle"))}</h3><div id="researchLog"></div><h3>${esc(t("formulaTitle"))}</h3><div id="formulaSection"></div><h3>${esc(t("reviewsTitle"))}</h3><div id="reviewsSection"></div><h3>${esc(t("signalsTitle"))}</h3><div id="signalsSection"></div>`;
+  $("#tab-info").innerHTML = html + `<h3>${esc(t("logTitle"))}</h3><div id="researchLog"></div><div class="fxhead"><h3>${esc(t("formulaTitle"))}</h3><button id="formulaExportBtn" class="btn ghost small" type="button" data-i18n="exportXlsx">${esc(t("exportXlsx"))}</button></div><div id="formulaSection"></div><h3>${esc(t("reviewsTitle"))}</h3><div id="reviewsSection"></div><h3>${esc(t("signalsTitle"))}</h3><div id="signalsSection"></div>`;
   loadResearchLog(c.id, $("#researchLog"));
   loadFormulaSection(c.id, $("#formulaSection"));
+  const fxBtn = $("#formulaExportBtn");
+  if (fxBtn) fxBtn.addEventListener("click", () => exportBrandFormulas(c, fxBtn, $("#formulaSection")));
   loadReviewsSection(c.id, $("#reviewsSection"));
   loadSignalsSection(c.id, $("#signalsSection"));
   document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === tab));
@@ -1334,17 +1348,37 @@ function renderCompare() {   // 語言切換時重繪（不重抓產品；成分
   if (compareProducts) renderCompareList();
   if (compareShown) runCompare();
 }
-function compareHtml(sel, rows) {
+/* 對比共用資料：營養素名聯集（首次出現順序）＋成分交集／獨有（畫面與 Excel 匯出共用） */
+function compareData(sel, rows) {
   const byProduct = {};
   sel.forEach(p => { byProduct[p.id] = rows.filter(r => r.product_id === p.id); });
   const norm = s => (s || "").trim().toLowerCase();
-  /* (a) 營養素矩陣：各產品 nutrition_facts 成分名聯集（依首次出現順序） */
   const nfNames = [];
   const nfSeen = new Set();
   sel.forEach(p => byProduct[p.id].filter(r => r.source === "nutrition_facts").forEach(r => {
     const k = norm(r.ingredient_name);
     if (k && !nfSeen.has(k)) { nfSeen.add(k); nfNames.push(r.ingredient_name); }
   }));
+  const ilSets = sel.map(p => {
+    const s = new Set();
+    byProduct[p.id].filter(r => r.source !== "nutrition_facts").forEach(r => { if (norm(r.ingredient_name)) s.add(norm(r.ingredient_name)); });
+    return s;
+  });
+  const displayName = k => {
+    for (const p of sel) {
+      const r = byProduct[p.id].find(x => norm(x.ingredient_name) === k);
+      if (r) return r.ingredient_name;
+    }
+    return k;
+  };
+  const common = ilSets.length ? [...ilSets[0]].filter(k => ilSets.every(s => s.has(k))) : [];
+  const uniqueFor = i => [...ilSets[i]].filter(k => !ilSets.some((s, j) => j !== i && s.has(k)));
+  return { byProduct, norm, nfNames, ilSets, displayName, common, uniqueFor };
+}
+function compareHtml(sel, rows) {
+  const d = compareData(sel, rows);
+  const { byProduct, norm, nfNames, displayName, common, uniqueFor } = d;
+  /* (a) 營養素矩陣：各產品 nutrition_facts 成分名聯集（依首次出現順序） */
   let h = `<h3>${esc(t("cmpNutrients"))}</h3>`;
   const nfMissing = sel.filter(p => !byProduct[p.id].some(r => r.source === "nutrition_facts"));
   if (nfMissing.length) {
@@ -1365,23 +1399,10 @@ function compareHtml(sel, rows) {
     h += `</tbody></table></div>`;
   }
   /* (b) 成分重疊：ingredients_list 交集與各產品獨有 */
-  const ilSets = sel.map(p => {
-    const s = new Set();
-    byProduct[p.id].filter(r => r.source !== "nutrition_facts").forEach(r => { if (norm(r.ingredient_name)) s.add(norm(r.ingredient_name)); });
-    return s;
-  });
-  const displayName = k => {
-    for (const p of sel) {
-      const r = byProduct[p.id].find(x => norm(x.ingredient_name) === k);
-      if (r) return r.ingredient_name;
-    }
-    return k;
-  };
-  const common = ilSets.length ? [...ilSets[0]].filter(k => ilSets.every(s => s.has(k))) : [];
   h += `<h3 style="margin-top:14px">${esc(t("cmpOverlap"))}</h3>`;
   h += `<div><b>${esc(t("cmpCommon"))}</b>：${common.length ? common.map(displayName).map(esc).join(" · ") : "—"}</div>`;
   sel.forEach((p, i) => {
-    const unique = [...ilSets[i]].filter(k => !ilSets.some((s, j) => j !== i && s.has(k)));
+    const unique = uniqueFor(i);
     h += `<div><b>${esc(p.product_name || p.id)}</b> ${esc(t("cmpUnique"))}：${unique.length ? unique.map(displayName).map(esc).join(" · ") : "—"}</div>`;
   });
   return h;
@@ -1521,7 +1542,7 @@ function openLeadDetail(l) {
     html += `<dt>${esc(label)}</dt><dd>${leadFieldVal(l, f)}</dd>`;
   });
   html += `</dl>`;
-  $("#ldBody").innerHTML = html + `<h3 style="margin-top:14px">${esc(t("logTitle"))}</h3><div id="ldResearchLog"></div><h3 style="margin-top:14px">${esc(t("formulaTitle"))}</h3><div id="ldFormulaSection"></div><h3 style="margin-top:14px">${esc(t("reviewsTitle"))}</h3><div id="ldReviewsSection"></div><h3 style="margin-top:14px">${esc(t("signalsTitle"))}</h3><div id="ldSignalsSection"></div>`;
+  $("#ldBody").innerHTML = html + `<h3 style="margin-top:14px">${esc(t("logTitle"))}</h3><div id="ldResearchLog"></div><div class="fxhead"><h3>${esc(t("formulaTitle"))}</h3><button id="ldFormulaExportBtn" class="btn ghost small" type="button" data-i18n="exportXlsx">${esc(t("exportXlsx"))}</button></div><div id="ldFormulaSection"></div><h3 style="margin-top:14px">${esc(t("reviewsTitle"))}</h3><div id="ldReviewsSection"></div><h3 style="margin-top:14px">${esc(t("signalsTitle"))}</h3><div id="ldSignalsSection"></div>`;
   const done = l.status === "promoted" || l.status === "rejected";
   $("#ldPromoteBtn").disabled = done || leadBusy === l.id;
   $("#ldRejectBtn").disabled = done || leadBusy === l.id;
@@ -1533,6 +1554,8 @@ function openLeadDetail(l) {
   loadLeadApollo(l);
   loadResearchLog(l.id, $("#ldResearchLog"));
   loadFormulaSection(l.id, $("#ldFormulaSection"));
+  const lfxBtn = $("#ldFormulaExportBtn");
+  if (lfxBtn) lfxBtn.addEventListener("click", () => exportBrandFormulas(l, lfxBtn, $("#ldFormulaSection")));
   loadReviewsSection(l.id, $("#ldReviewsSection"));
   loadSignalsSection(l.id, $("#ldSignalsSection"));
 }
@@ -1834,6 +1857,245 @@ async function loadFormulaSection(brandId, el) {
     loadProductFormula(p, box);
   });
 }
+/* ---------- Excel (.xlsx) 匯出：原生實作，零外部依賴 ----------
+   最小 XLSX = ZIP（stored，不壓縮）＋ sharedStrings ＋ 簡單樣式（首列粗體）。
+   ZIP 需 CRC32；字串以 UTF-8 存入 sharedStrings，數字以數值儲存格寫入。 */
+const XLSX_CRC = (() => {
+  const table = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+function xlsxCrc32(buf) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < buf.length; i++) c = XLSX_CRC[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+const xlsxXmlEsc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const xlsxAttrEsc = s => xlsxXmlEsc(s).replace(/"/g, "&quot;");
+/* 工作表名：Excel 上限 31 字、禁 []:*?/\，重名加 (2)(3)… */
+function xlsxSheetName(name, used) {
+  let base = String(name || "").replace(/[\\\/\?\*\[\]:]/g, "").trim() || "Sheet";
+  base = base.slice(0, 31);
+  let out = base, i = 2;
+  while (used.has(out)) { out = base.slice(0, 28) + " (" + i + ")"; i++; }
+  used.add(out);
+  return out;
+}
+function xlsxZip(files) {
+  const enc = new TextEncoder();
+  const local = [], central = [];
+  let offset = 0;
+  files.forEach(f => {
+    const nameBytes = enc.encode(f.name);
+    const crc = xlsxCrc32(f.data);
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true);
+    lh.setUint16(4, 20, true);
+    lh.setUint16(6, 0x0800, true);   // UTF-8 檔名
+    lh.setUint16(8, 0, true);        // stored（不壓縮）
+    lh.setUint16(10, 0, true);
+    lh.setUint16(12, 0x21, true);    // 1980-01-01
+    lh.setUint32(14, crc, true);
+    lh.setUint32(18, f.data.length, true);
+    lh.setUint32(22, f.data.length, true);
+    lh.setUint16(26, nameBytes.length, true);
+    lh.setUint16(28, 0, true);
+    local.push(new Uint8Array(lh.buffer), nameBytes, f.data);
+    const ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0, 0x02014b50, true);
+    ch.setUint16(4, 20, true);
+    ch.setUint16(6, 20, true);
+    ch.setUint16(8, 0x0800, true);
+    ch.setUint16(10, 0, true);
+    ch.setUint16(12, 0, true);
+    ch.setUint16(14, 0x21, true);
+    ch.setUint32(16, crc, true);
+    ch.setUint32(20, f.data.length, true);
+    ch.setUint32(24, f.data.length, true);
+    ch.setUint16(28, nameBytes.length, true);
+    ch.setUint16(30, 0, true);
+    ch.setUint16(32, 0, true);
+    ch.setUint16(34, 0, true);
+    ch.setUint16(36, 0, true);
+    ch.setUint32(38, 0, true);
+    ch.setUint32(42, offset, true);
+    central.push(new Uint8Array(ch.buffer), nameBytes);
+    offset += 30 + nameBytes.length + f.data.length;
+  });
+  const cdSize = central.reduce((n, b) => n + b.length, 0);
+  const eocd = new DataView(new ArrayBuffer(22));
+  eocd.setUint32(0, 0x06054b50, true);
+  eocd.setUint16(8, files.length, true);
+  eocd.setUint16(10, files.length, true);
+  eocd.setUint32(12, cdSize, true);
+  eocd.setUint32(16, offset, true);
+  return new Blob([...local, ...central, new Uint8Array(eocd.buffer)], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+}
+/* sheets: [{name, rows:[[string|number|null,...]]}]；第一列粗體 */
+function xlsxBuildBook(sheets) {
+  const enc = new TextEncoder();
+  const strings = [], strIdx = new Map();
+  let strRefs = 0;
+  const strId = s => {
+    s = String(s);
+    strRefs++;
+    if (!strIdx.has(s)) { strIdx.set(s, strings.length); strings.push(s); }
+    return strIdx.get(s);
+  };
+  const colLetter = n => {
+    let s = "";
+    n++;
+    while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
+    return s;
+  };
+  const sheetXml = rows => {
+    let x = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>`;
+    rows.forEach((row, ri) => {
+      x += `<row r="${ri + 1}">`;
+      row.forEach((cell, ci) => {
+        if (cell == null || cell === "") return;
+        const ref = colLetter(ci) + (ri + 1);
+        const bold = ri === 0 ? ` s="1"` : "";
+        if (typeof cell === "number" && isFinite(cell)) x += `<c r="${ref}"${bold}><v>${cell}</v></c>`;
+        else x += `<c r="${ref}" t="s"${bold}><v>${strId(cell)}</v></c>`;
+      });
+      x += `</row>`;
+    });
+    return x + `</sheetData></worksheet>`;
+  };
+  const NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+  const NSR = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+  /* 先產生各工作表 XML（此時才填滿 sharedStrings），再組 sharedStrings.xml */
+  const sheetXmls = sheets.map(s => sheetXml(s.rows));
+  const files = [
+    { name: "[Content_Types].xml", data: enc.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>` + sheets.map((s, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("") + `<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`) },
+    { name: "_rels/.rels", data: enc.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`) },
+    { name: "xl/workbook.xml", data: enc.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="${NS}" xmlns:r="${NSR}"><sheets>` + sheets.map((s, i) => `<sheet name="${xlsxAttrEsc(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join("") + `</sheets></workbook>`) },
+    { name: "xl/_rels/workbook.xml.rels", data: enc.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` + sheets.map((s, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join("") + `<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/><Relationship Id="rId${sheets.length + 2}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`) },
+    { name: "xl/sharedStrings.xml", data: enc.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><sst xmlns="${NS}" count="${strRefs}" uniqueCount="${strings.length}">` + strings.map(s => `<si><t xml:space="preserve">${xlsxXmlEsc(s)}</t></si>`).join("") + `</sst>`) },
+    { name: "xl/styles.xml", data: enc.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="${NS}"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`) },
+    ...sheets.map((s, i) => ({ name: `xl/worksheets/sheet${i + 1}.xml`, data: enc.encode(sheetXmls[i]) })),
+  ];
+  return xlsxZip(files);
+}
+function xlsxDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function xlsxToday() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+const xlsxSafeName = s => String(s || "").replace(/[\\\/:*?"<>|]/g, "-").trim() || "brand";
+/* 品牌 Store 連結（主檔／名單任一邊找得到就用） */
+function brandStoreUrl(brandId) {
+  const c = companies.find(x => x.id === brandId);
+  if (c && c.amazon_store_url) return c.amazon_store_url;
+  const l = leads.find(x => x.id === brandId);
+  return (l && l.amazon_store_url) || "";
+}
+/* 產品總表：每產品一行；storeUrl 可為字串（全表同一家）或函式（逐產品取品牌 Store） */
+function productsOverviewRows(products, storeUrl) {
+  const rows = [[t("cmpProduct"), "ASIN", t("format"), t("formulaServing"), t("formulaServings"), t("formulaFlavors"), t("formulaClaims"), t("formulaCalories"), t("formulaColStore")]];
+  products.forEach(p => rows.push([
+    p.product_name || "", p.asin || "", p.form || "", p.serving_size || "",
+    p.servings_per_container == null ? "" : p.servings_per_container,
+    p.flavors || "", p.claims || "",
+    p.calories == null ? "" : p.calories,
+    typeof storeUrl === "function" ? storeUrl(p) : (storeUrl || "")
+  ]));
+  return rows;
+}
+/* 單一產品成分表：營養成分在前、成分表在後，來源欄位標示所屬群組 */
+function productIngredientRows(ings) {
+  const rows = [[t("formulaColIngredient"), t("formulaColForm"), t("formulaColAmountValue"), t("formulaColUnit"), t("formulaColDv"), t("formulaColCategory"), t("formulaColSource")]];
+  const nf = ings.filter(r => r.source === "nutrition_facts");
+  const il = ings.filter(r => r.source !== "nutrition_facts");
+  [...nf, ...il].forEach(r => rows.push([
+    r.ingredient_name || "", r.ingredient_form || "",
+    r.amount_value == null ? "" : r.amount_value,
+    r.amount_unit || "",
+    r.dv_pct == null ? "" : r.dv_pct,
+    r.category || "",
+    r.source === "nutrition_facts" ? t("formulaNutrition") : t("formulaIngredients")
+  ]));
+  return rows;
+}
+/* (a) 明細匯出：產品總表＋每產品一張成分表 */
+async function exportBrandFormulas(brand, btn, sectionEl) {
+  const brandName = brand.name || brand.brand || t("untitled");
+  const setBusy = b => { if (btn) { btn.disabled = b; btn.textContent = b ? t("exporting") : t("exportXlsx"); } };
+  setBusy(true);
+  try {
+    const products = await api.productsByBrand(brand.id);
+    if (!Array.isArray(products) || !products.length) throw new Error(t("exportNoData"));
+    const used = new Set();
+    const sheets = [{ name: xlsxSheetName(t("sheetProducts"), used), rows: productsOverviewRows(products, brand.amazon_store_url || "") }];
+    for (const p of products) {
+      let ings = [];
+      try { ings = await api.ingredientsByProduct(p.id); } catch (e) { ings = []; }
+      sheets.push({ name: xlsxSheetName(p.product_name || p.asin || p.id, used), rows: productIngredientRows(Array.isArray(ings) ? ings : []) });
+    }
+    xlsxDownload(xlsxBuildBook(sheets), `${xlsxSafeName(brandName)}-配方-${xlsxToday()}.xlsx`);
+  } catch (e) {
+    if (sectionEl) {
+      const d = document.createElement("div");
+      d.className = "err";
+      d.textContent = t("exportFail") + e.message;
+      sectionEl.appendChild(d);
+    }
+  } finally { setBusy(false); }
+}
+/* (b) 配方對比匯出：產品總表＋營養素矩陣＋成分重疊 */
+async function exportCompareXlsx() {
+  const msg = $("#cmpMsg"), btn = $("#cmpExportBtn");
+  msg.textContent = "";
+  if (compareSelected.length < 2) { msg.textContent = t("cmpMin"); return; }
+  if (compareSelected.length > 4) { msg.textContent = t("cmpMax"); return; }
+  btn.disabled = true;
+  btn.textContent = t("exporting");
+  try {
+    const sel = compareProducts.filter(p => compareSelected.includes(p.id));
+    sel.sort((a, b) => compareSelected.indexOf(a.id) - compareSelected.indexOf(b.id));
+    const key = compareSelected.join(",");
+    let ings;
+    if (compareIngCache && compareIngCache.key === key) ings = compareIngCache.rows;
+    else { ings = await api.ingredientsByProductIds(compareSelected); compareIngCache = { key, rows: ings }; }
+    const d = compareData(sel, Array.isArray(ings) ? ings : []);
+    const used = new Set();
+    const sheets = [{ name: xlsxSheetName(t("sheetProducts"), used), rows: productsOverviewRows(sel, p => brandStoreUrl(p.brand_id)) }];
+    const mRows = [[t("formulaColIngredient"), ...sel.map(p => p.product_name || p.id)]];
+    d.nfNames.forEach(name => {
+      mRows.push([name, ...sel.map(p => {
+        const r = d.byProduct[p.id].find(x => x.source === "nutrition_facts" && d.norm(x.ingredient_name) === d.norm(name));
+        return r ? fmtAmount(r.amount_value, r.amount_unit) + (r.dv_pct == null ? "" : " (" + r.dv_pct + "%)") : "—";
+      })]);
+    });
+    sheets.push({ name: xlsxSheetName(t("cmpNutrients"), used), rows: mRows });
+    const oRows = [[t("formulaColCategory"), t("formulaColIngredient")]];
+    d.common.forEach(k => oRows.push([t("cmpCommon"), d.displayName(k)]));
+    sel.forEach((p, i) => d.uniqueFor(i).forEach(k => oRows.push([(p.product_name || p.id) + " " + t("cmpUnique"), d.displayName(k)])));
+    sheets.push({ name: xlsxSheetName(t("cmpOverlap"), used), rows: oRows });
+    xlsxDownload(xlsxBuildBook(sheets), `配方對比-${xlsxToday()}.xlsx`);
+  } catch (e) {
+    msg.textContent = t("exportFail") + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = t("exportXlsx");
+  }
+}
+$("#cmpExportBtn").addEventListener("click", () => exportCompareXlsx());
 /* ---------- 評價訊息池（crm_reviews） ---------- */
 function reviewSourceLabel(s) {
   return s === "judge.me" ? "Judge.me"
