@@ -260,9 +260,15 @@ a{color:var(--accent)}
     </div>
     <div id="ldTags" style="margin:10px 0"></div>
     <div id="ldBody"></div>
-    <div style="margin-top:14px;display:flex;gap:8px;align-items:center">
+    <div id="ldEditBody" class="hidden"></div>
+    <div id="ldResearch" class="muted" style="margin-top:10px"></div>
+    <div style="margin-top:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button id="ldEditBtn" class="btn ghost small" type="button" data-i18n="leadEdit">編輯</button>
+      <button id="ldResearchBtn" class="btn ghost small" type="button" data-i18n="leadResearch">研究</button>
       <button id="ldPromoteBtn" class="btn small" type="button" data-i18n="leadPromote">晉升</button>
       <button id="ldRejectBtn" class="btn ghost small" type="button" data-i18n="leadReject">拒絕</button>
+      <button id="ldSaveBtn" class="btn small hidden" type="button" data-i18n="leadSave">儲存</button>
+      <button id="ldCancelBtn" class="btn ghost small hidden" type="button" data-i18n="leadCancel">取消</button>
       <span id="ldMsg" class="err"></span>
     </div>
   </div>
@@ -315,6 +321,14 @@ const I18N = {
     leadPromote:"晉升", leadReject:"拒絕",
     leadPromoteConfirm:"確定將「{b}」晉升到品牌主檔？", leadRejectConfirm:"確定拒絕「{b}」？",
     leadPromoted:"已晉升到品牌主檔。", leadRejected:"已拒絕。",
+    leadEdit:"編輯", leadResearch:"研究", leadSave:"儲存", leadCancel:"取消",
+    leadSaved:"已儲存。", leadSaveFail:"儲存失敗：",
+    leadBrandRequired:"品牌不可為空。", leadNumFail:"數字欄位需填數字。",
+    leadResearchConfirm:"確定請求研究「{b}」？研究完成後會把封包交給你審核，不會自動合併。",
+    leadResearchRequested:"研究請求已送出。", leadResearchFail:"請求失敗：",
+    leadResearchStatus:"研究：{s}",
+    leadResearchRequestedAt:"已請求（{d}）", leadResearchInProgress:"研究中（{d}）",
+    leadResearchDone:"已完成（{d}）", leadResearchFailed:"失敗（{d}）",
     leadPromotedPartial:"品牌已建立，但名單狀態更新失敗（請在 Supabase 手動將此名單改為已晉升）：",
     leadActionFail:"操作失敗：", leadNoDomain:"這家沒有網域，無法晉升（主檔網域為必填且唯一，請先補網域）。",
     leadNoResult:"沒有符合的名單。", leadShowing:"名單共 {n} 筆，顯示 {m} 筆",
@@ -355,6 +369,14 @@ const I18N = {
     leadPromote:"Promote", leadReject:"Reject",
     leadPromoteConfirm:"Promote “{b}” to the companies list?", leadRejectConfirm:"Reject “{b}”?",
     leadPromoted:"Promoted to companies.", leadRejected:"Rejected.",
+    leadEdit:"Edit", leadResearch:"Research", leadSave:"Save", leadCancel:"Cancel",
+    leadSaved:"Saved.", leadSaveFail:"Save failed: ",
+    leadBrandRequired:"Brand is required.", leadNumFail:"Number fields must be numbers.",
+    leadResearchConfirm:"Request research on “{b}”? The packet will be handed to you for review when done — nothing merges automatically.",
+    leadResearchRequested:"Research requested.", leadResearchFail:"Request failed: ",
+    leadResearchStatus:"Research: {s}",
+    leadResearchRequestedAt:"Requested ({d})", leadResearchInProgress:"Researching ({d})",
+    leadResearchDone:"Done ({d})", leadResearchFailed:"Failed ({d})",
     leadPromotedPartial:"Company was created, but the lead status update failed (set this lead to promoted manually in Supabase): ",
     leadActionFail:"Action failed: ", leadNoDomain:"This lead has no domain, so it cannot be promoted (company domain is required and unique — add a domain first).",
     leadNoResult:"No matching leads.", leadShowing:"{n} leads in total, showing {m}",
@@ -463,7 +485,9 @@ const api = {
   /* 名單池：所有呼叫一律帶 headers()（GET 缺 header 會 401 並被登出，見 commit 6af06fd） */
   leads: () => sb("/rest/v1/crm_leads?select=*&order=monthly_revenue.desc&limit=1000", { headers: headers() }),
   addCompany: body => sb("/rest/v1/crm_companies", { method: "POST", headers: headers(true), body: JSON.stringify(body) }),
-  patchLead: (id, body) => sb("/rest/v1/crm_leads?id=eq." + encodeURIComponent(id), { method: "PATCH", headers: headers(true), body: JSON.stringify(body) })
+  patchLead: (id, body) => sb("/rest/v1/crm_leads?id=eq." + encodeURIComponent(id), { method: "PATCH", headers: headers(true), body: JSON.stringify(body) }),
+  researchRequests: leadId => sb("/rest/v1/crm_research_requests?lead_id=eq." + encodeURIComponent(leadId) + "&select=*&order=requested_at.desc&limit=5", { headers: headers() }),
+  addResearchRequest: body => sb("/rest/v1/crm_research_requests", { method: "POST", headers: headers(true), body: JSON.stringify(body) })
 };
 
 /* ---------- 語言 ---------- */
@@ -1018,6 +1042,15 @@ function leadFieldVal(l, f) {
 }
 function openLeadDetail(l) {
   currentLead = l;
+  leadEditing = false;
+  $("#ldEditBody").classList.add("hidden");
+  $("#ldBody").classList.remove("hidden");
+  $("#ldEditBtn").classList.remove("hidden");
+  $("#ldResearchBtn").classList.remove("hidden");
+  $("#ldPromoteBtn").classList.remove("hidden");
+  $("#ldRejectBtn").classList.remove("hidden");
+  $("#ldSaveBtn").classList.add("hidden");
+  $("#ldCancelBtn").classList.add("hidden");
   $("#ldName").textContent = l.brand || t("untitled");
   $("#ldDomain").textContent = l.domain || "";
   $("#ldTags").innerHTML =
@@ -1034,13 +1067,172 @@ function openLeadDetail(l) {
   const done = l.status === "promoted" || l.status === "rejected";
   $("#ldPromoteBtn").disabled = done || leadBusy === l.id;
   $("#ldRejectBtn").disabled = done || leadBusy === l.id;
+  $("#ldEditBtn").disabled = leadBusy === l.id;
+  $("#ldResearchBtn").disabled = true; // 載入請求狀態前先鎖住，避免重複送出
   $("#ldMsg").textContent = "";
   $("#leadOverlay").classList.remove("hidden");
+  loadLeadResearch(l);
 }
 function closeLeadDetail() {
   $("#leadOverlay").classList.add("hidden");
   currentLead = null;
+  leadEditing = false;
 }
+/* ---------- 名單編輯 ---------- */
+let leadEditing = false;
+const LEAD_EDIT_FIELDS = [
+  ["brand", "text"], ["domain", "text"], ["source", "text"], ["source_id", "text"],
+  ["monthly_sales", "number"], ["monthly_revenue", "number"],
+  ["revenue_band", "select"], ["tier", "select"], ["status", "select"], ["dedupe_status", "select"], ["date_sc", "date"],
+];
+const LEAD_BANDS = ["A1: >=$1M/mo", "A2: $100K-1M/mo", "B: $10K-100K/mo", "C: <$10K/mo", "ELEC Top100"];
+const LEAD_DEDUPE = ["new", "duplicate", "review"];
+function leadEditOptions(f) {
+  if (f === "revenue_band") return ["", ...LEAD_BANDS];
+  if (f === "tier") return ["", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
+  if (f === "status") return ["new", "qualified", "promoted", "rejected"];
+  if (f === "dedupe_status") return LEAD_DEDUPE;
+  return null;
+}
+function leadEditOptionLabel(f, v) {
+  if (v === "") return "—";
+  if (f === "status") return leadStatusLabel(v);
+  return v;
+}
+function enterLeadEdit() {
+  const l = currentLead;
+  if (!l) return;
+  leadEditing = true;
+  let html = `<div class="editgrid">`;
+  LEAD_EDIT_FIELDS.forEach(([f, type]) => {
+    const label = LEAD_FIELD_LABEL[f][lang === "en" ? 1 : 0];
+    const v = l[f];
+    const full = (f === "brand" || f === "domain") ? " full" : "";
+    html += `<div class="${full.trim()}"><label class="muted">${esc(label)}</label>`;
+    const opts = leadEditOptions(f);
+    if (opts) {
+      html += `<select id="le_${f}">` + opts.map(o => `<option value="${esc(o)}" ${String(v == null ? "" : v) === o ? "selected" : ""}>${esc(leadEditOptionLabel(f, o))}</option>`).join("") + `</select>`;
+    } else if (type === "number") {
+      html += `<input id="le_${f}" type="number" min="0" step="any" value="${esc(v == null ? "" : v)}">`;
+    } else if (type === "date") {
+      html += `<input id="le_${f}" type="date" value="${esc(v == null ? "" : String(v).slice(0, 10))}">`;
+    } else {
+      html += `<input id="le_${f}" type="text" value="${esc(v == null ? "" : v)}">`;
+    }
+    html += `</div>`;
+  });
+  html += `</div>`;
+  $("#ldEditBody").innerHTML = html;
+  $("#ldEditBody").classList.remove("hidden");
+  $("#ldBody").classList.add("hidden");
+  $("#ldEditBtn").classList.add("hidden");
+  $("#ldResearchBtn").classList.add("hidden");
+  $("#ldPromoteBtn").classList.add("hidden");
+  $("#ldRejectBtn").classList.add("hidden");
+  $("#ldSaveBtn").classList.remove("hidden");
+  $("#ldCancelBtn").classList.remove("hidden");
+  $("#ldMsg").textContent = "";
+}
+function exitLeadEdit() {
+  leadEditing = false;
+  $("#ldEditBody").classList.add("hidden");
+  $("#ldBody").classList.remove("hidden");
+  $("#ldEditBtn").classList.remove("hidden");
+  $("#ldResearchBtn").classList.remove("hidden");
+  $("#ldPromoteBtn").classList.remove("hidden");
+  $("#ldRejectBtn").classList.remove("hidden");
+  $("#ldSaveBtn").classList.add("hidden");
+  $("#ldCancelBtn").classList.add("hidden");
+  $("#ldMsg").textContent = "";
+}
+async function saveLeadEdit() {
+  const l = currentLead;
+  if (!l) return;
+  const msg = $("#ldMsg");
+  const body = {};
+  for (const [f, type] of LEAD_EDIT_FIELDS) {
+    const el = document.getElementById("le_" + f);
+    if (!el) continue;
+    let v = el.value.trim();
+    if (v === "") { body[f] = null; continue; }
+    if (type === "number") {
+      const n = Number(v);
+      if (!Number.isFinite(n) || n < 0) { msg.textContent = t("leadNumFail"); msg.className = "err"; return; }
+      body[f] = n;
+    } else if (f === "tier") {
+      body[f] = Number(v);
+    } else {
+      body[f] = v;
+    }
+  }
+  if (!body.brand) { msg.textContent = t("leadBrandRequired"); msg.className = "err"; return; }
+  msg.textContent = "";
+  try {
+    await api.patchLead(l.id, body);
+    Object.assign(l, body);
+    exitLeadEdit();
+    openLeadDetail(l);
+    renderLeadsStats(); renderLeads();
+    const m = $("#ldMsg");
+    m.textContent = t("leadSaved");
+    m.className = "ok";
+  } catch (e) {
+    msg.textContent = t("leadSaveFail") + e.message;
+    msg.className = "err";
+  }
+}
+$("#ldEditBtn").addEventListener("click", enterLeadEdit);
+$("#ldCancelBtn").addEventListener("click", exitLeadEdit);
+$("#ldSaveBtn").addEventListener("click", saveLeadEdit);
+/* ---------- 名單研究請求 ---------- */
+let leadResearch = null; // 目前名單最新一筆研究請求
+function researchStatusText(r) {
+  const d = r.status === "done" ? r.completed_at : r.status === "in_progress" ? r.started_at : r.requested_at;
+  const ds = d ? new Date(d).toLocaleString(lang === "en" ? "en-US" : "zh-TW") : "";
+  const key = { requested: "leadResearchRequestedAt", in_progress: "leadResearchInProgress", done: "leadResearchDone", failed: "leadResearchFailed" }[r.status] || "leadResearchRequestedAt";
+  return t(key).replace("{d}", ds);
+}
+function renderLeadResearch() {
+  const el = $("#ldResearch");
+  if (!leadResearch) { el.textContent = ""; $("#ldResearchBtn").disabled = false; return; }
+  el.textContent = t("leadResearchStatus").replace("{s}", researchStatusText(leadResearch));
+  $("#ldResearchBtn").disabled = leadResearch.status === "requested" || leadResearch.status === "in_progress";
+}
+async function loadLeadResearch(l) {
+  leadResearch = null;
+  try {
+    const rows = await api.researchRequests(l.id);
+    if (Array.isArray(rows) && rows.length) leadResearch = rows[0];
+  } catch (e) { leadResearch = null; }
+  if (currentLead && currentLead.id === l.id) renderLeadResearch();
+}
+let researchRequesting = false;
+async function requestLeadResearch() {
+  const l = currentLead;
+  if (!l || researchRequesting) return;
+  if (leadResearch && (leadResearch.status === "requested" || leadResearch.status === "in_progress")) return;
+  if (!confirm(t("leadResearchConfirm").replace("{b}", l.brand))) return;
+  researchRequesting = true;
+  $("#ldResearchBtn").disabled = true;
+  const msg = $("#ldMsg");
+  try {
+    const rows = await api.addResearchRequest({
+      lead_id: l.id, brand: l.brand, domain: l.domain || null, status: "requested",
+      requested_by: session && session.user ? (session.user.email || session.user.id) : null,
+    });
+    leadResearch = Array.isArray(rows) ? rows[0] : rows;
+    renderLeadResearch();
+    msg.textContent = t("leadResearchRequested");
+    msg.className = "ok";
+  } catch (e) {
+    msg.textContent = t("leadResearchFail") + e.message;
+    msg.className = "err";
+    renderLeadResearch();
+  } finally {
+    researchRequesting = false;
+  }
+}
+$("#ldResearchBtn").addEventListener("click", requestLeadResearch);
 $("#ldCloseBtn").addEventListener("click", closeLeadDetail);
 $("#leadOverlay").addEventListener("click", e => { if (e.target.id === "leadOverlay") closeLeadDetail(); });
 $("#ldPromoteBtn").addEventListener("click", async () => {
