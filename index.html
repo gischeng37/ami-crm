@@ -47,6 +47,15 @@ a{color:var(--accent)}
 .row{display:grid;grid-template-columns:2.2fr 1fr .8fr 1fr 1.2fr;gap:10px;align-items:center;padding:12px 8px;border-bottom:1px solid var(--line);cursor:pointer}
 .row:hover{background:#f7fafc}
 .row.head{font-size:12px;color:var(--muted);cursor:default;background:none;font-weight:700}
+/* 欄位名稱列：瀏覽時懸浮固定在頂欄下方 */
+.row.head{position:sticky;top:var(--stickyTop,56px);z-index:10;background:var(--card);border-bottom:2px solid var(--line);box-shadow:0 1px 0 var(--line)}
+/* 翻頁列 */
+.pager{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:14px 8px 6px}
+.pager .pg{min-width:34px;padding:6px 10px;border:1px solid var(--line);background:#fff;border-radius:8px}
+.pager .pg.on{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700}
+.pager .pg:disabled{opacity:.5;cursor:not-allowed}
+.pager .dots{color:var(--muted);padding:0 2px}
+.pager .info{margin-left:auto;color:var(--muted);font-size:13px}
 .row .nm{font-weight:700}
 .row .dm{color:var(--muted);font-size:13px;word-break:break-all}
 .tag{display:inline-block;background:var(--chip);border-radius:999px;padding:2px 9px;font-size:12px;white-space:nowrap}
@@ -76,9 +85,11 @@ a{color:var(--accent)}
 /* 名單池 */
 .lfilters{display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:10px;align-items:end}
 .lfilters label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
-.lrow{display:grid;grid-template-columns:2fr 1.1fr .8fr .8fr .5fr .9fr 1.7fr;gap:10px;align-items:center;padding:12px 8px;border-bottom:1px solid var(--line)}
+.lrow{display:grid;grid-template-columns:2fr 1.1fr .8fr .8fr .5fr .9fr 1.7fr;gap:10px;align-items:center;padding:12px 8px;border-bottom:1px solid var(--line);cursor:pointer}
 .lrow:hover{background:#f7fafc}
 .lrow.head{font-size:12px;color:var(--muted);cursor:default;background:none;font-weight:700}
+/* 名單池欄位名稱列：同品牌主檔，瀏覽時懸浮固定 */
+.lrow.head{position:sticky;top:var(--stickyTop,56px);z-index:10;background:var(--card);border-bottom:2px solid var(--line);box-shadow:0 1px 0 var(--line)}
 .lrow .nm{font-weight:700}
 .lrow .dm{color:var(--muted);font-size:13px;word-break:break-all}
 .lrow .num{font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -177,6 +188,7 @@ a{color:var(--accent)}
       <div id="listMeta" class="muted" style="padding:10px 8px 0"></div>
       <div class="row head"><span data-i18n="colBrand">品牌</span><span data-i18n="colPriority">優先級</span><span data-i18n="colStage">階段</span><span data-i18n="colFactory">工廠</span><span data-i18n="colContact">聯絡</span></div>
       <div id="list"></div>
+      <div id="pager" class="pager"></div>
       <div id="listEmpty" class="empty hidden" data-i18n="noResult">沒有符合的品牌。</div>
     </div>
     </div>
@@ -198,6 +210,7 @@ a{color:var(--accent)}
         <div id="leadsMeta" class="muted" style="padding:10px 8px 0"></div>
         <div class="lrow head"><span data-i18n="colBrand">品牌</span><span data-i18n="colRevenue">月營收</span><span data-i18n="colSales">月銷量</span><span data-i18n="colBand">級距</span><span data-i18n="colTier">級別</span><span data-i18n="colStatus">狀態</span><span data-i18n="colActions">操作</span></div>
         <div id="leadsList"></div>
+        <div id="leadPager" class="pager"></div>
         <div id="leadsEmpty" class="empty hidden" data-i18n="leadNoResult">沒有符合的名單。</div>
       </div>
       <p id="leadsMsg" class="err"></p>
@@ -237,6 +250,23 @@ a{color:var(--accent)}
     <div id="tab-activities" class="hidden"></div>
   </div>
 </div>
+
+<!-- 名單明細 -->
+<div id="leadOverlay" class="overlay hidden">
+  <div class="panel" role="dialog" aria-modal="true">
+    <div style="display:flex;gap:8px;justify-content:space-between;align-items:start">
+      <div><h2 id="ldName"></h2><div id="ldDomain" class="muted"></div></div>
+      <button id="ldCloseBtn" class="btn ghost small" type="button">✕</button>
+    </div>
+    <div id="ldTags" style="margin:10px 0"></div>
+    <div id="ldBody"></div>
+    <div style="margin-top:14px;display:flex;gap:8px;align-items:center">
+      <button id="ldPromoteBtn" class="btn small" type="button" data-i18n="leadPromote">晉升</button>
+      <button id="ldRejectBtn" class="btn ghost small" type="button" data-i18n="leadReject">拒絕</button>
+      <span id="ldMsg" class="err"></span>
+    </div>
+  </div>
+</div>
 <script>
 "use strict";
 /* 設定：主系統 ami-platform。SB_ANON 由建置腳本從 PROJECT.md 檔案對檔案填入（勿手抄）。 */
@@ -266,6 +296,7 @@ const I18N = {
     search:"搜尋", searchPh:"品牌名稱或網域…", priority:"優先級", stage:"階段", factory:"工廠", format:"劑型",
     all:"全部", reset:"重設", colBrand:"品牌", colPriority:"優先級", colStage:"階段", colFactory:"工廠", colContact:"聯絡",
     noResult:"沒有符合的品牌。", showing:"共 {n} 家，顯示 {m} 家",
+    pagePrev:"上一頁", pageNext:"下一頁", pageOf:"第 {p} 頁，共 {t} 頁", pageRange:"顯示第 {a}–{b} 家",
     statTotal:"品牌總數", statStage:"階段：{s}", followup:"跟進", owner:"負責人", nextDate:"下次跟進日",
     nextAction:"下一步行動", save:"儲存跟進", saved:"已儲存。", saveFail:"儲存失敗：",
     tabInfo:"資料", tabContacts:"聯絡人", tabDeals:"商機", tabActivities:"活動紀錄",
@@ -305,6 +336,7 @@ const I18N = {
     search:"Search", searchPh:"Brand name or domain…", priority:"Priority", stage:"Stage", factory:"Factory", format:"Format",
     all:"All", reset:"Reset", colBrand:"Brand", colPriority:"Priority", colStage:"Stage", colFactory:"Factory", colContact:"Contact",
     noResult:"No matching brands.", showing:"{n} brands in total, showing {m}",
+    pagePrev:"Previous", pageNext:"Next", pageOf:"Page {p} of {t}", pageRange:"Showing {a}–{b}",
     statTotal:"Total brands", statStage:"Stage: {s}", followup:"Follow-up", owner:"Owner", nextDate:"Next follow-up date",
     nextAction:"Next action", save:"Save follow-up", saved:"Saved.", saveFail:"Save failed: ",
     tabInfo:"Details", tabContacts:"Contacts", tabDeals:"Deals", tabActivities:"Activities",
@@ -389,6 +421,7 @@ let session = null;
 try { session = JSON.parse(localStorage.getItem("crm_session") || "null"); } catch(e) { session = null; }
 let companies = [];
 let current = null;   // 目前明細公司
+let currentLead = null;   // 目前明細名單
 let tab = "info";
 let leads = [];
 let leadsLoaded = false;
@@ -442,6 +475,8 @@ function applyLang() {
   renderStats(); renderList(); renderFilterOptions();
   renderLeadsStats(); renderLeads();
   if (current) renderDetail(current, true);
+  if (currentLead) openLeadDetail(currentLead);
+  syncStickyTop();
 }
 $("#langBtn").addEventListener("click", () => {
   lang = lang === "en" ? "zh" : "en";
@@ -618,13 +653,26 @@ function renderStats() {
   Object.keys(byStage).sort().forEach(s => { html += `<div class="stat"><b>${byStage[s]}</b><span>${esc(t("statStage").replace("{s}", stageLabel(s)))}</span></div>`; });
   el.innerHTML = html;
 }
+/* ---------- 品牌主檔翻頁 ---------- */
+const PAGE_SIZE = 50;
+let listPage = 1;
+/* 頂欄高度隨視窗／語言換行而變：量實際高度給懸浮表頭用 */
+function syncStickyTop() {
+  const bar = document.querySelector(".topbar");
+  if (bar) document.documentElement.style.setProperty("--stickyTop", bar.offsetHeight + "px");
+}
+window.addEventListener("resize", syncStickyTop);
 function renderList() {
   const list = filtered();
+  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  if (listPage > totalPages) listPage = totalPages;
+  const start = (listPage - 1) * PAGE_SIZE;
+  const page = list.slice(start, start + PAGE_SIZE);
   $("#listMeta").textContent = t("showing").replace("{n}", companies.length).replace("{m}", list.length);
   const box = $("#list");
   box.innerHTML = "";
   $("#listEmpty").classList.toggle("hidden", list.length > 0);
-  list.slice(0, 200).forEach(c => {
+  page.forEach(c => {
     const d = document.createElement("div");
     d.className = "row";
     d.innerHTML =
@@ -636,29 +684,70 @@ function renderList() {
     d.addEventListener("click", () => openDetail(c));
     box.appendChild(d);
   });
-  if (list.length > 200) {
-    const more = document.createElement("div");
-    more.className = "empty";
-    more.textContent = "… +" + (list.length - 200);
-    box.appendChild(more);
+  renderPager($("#pager"), listPage, totalPages, list.length, start, PAGE_SIZE, p => { listPage = p; renderList(); });
+}
+/* 翻頁列（品牌主檔與名單池共用）：el 為容器，goTo(p) 切換到第 p 頁 */
+function renderPager(el, page, totalPages, total, start, pageSize, goTo) {
+  el.innerHTML = "";
+  if (!total) return;
+  const end = Math.min(total, start + pageSize);
+  const prev = document.createElement("button");
+  prev.className = "btn ghost small";
+  prev.textContent = "‹ " + t("pagePrev");
+  prev.disabled = page <= 1;
+  prev.addEventListener("click", () => goTo(page - 1));
+  el.appendChild(prev);
+  /* 頁碼：頁數多時只顯示首頁／尾頁與目前頁前後一頁 */
+  let pages = [];
+  for (let p = 1; p <= totalPages; p++) pages.push(p);
+  if (totalPages > 9) {
+    pages = [1, 2, page - 1, page, page + 1, totalPages - 1, totalPages]
+      .filter((p, i, a) => p >= 1 && p <= totalPages && a.indexOf(p) === i).sort((a, b) => a - b);
   }
+  let last = 0;
+  pages.forEach(p => {
+    if (p - last > 1) {
+      const dots = document.createElement("span");
+      dots.className = "dots";
+      dots.textContent = "…";
+      el.appendChild(dots);
+    }
+    const b = document.createElement("button");
+    b.className = "pg" + (p === page ? " on" : "");
+    b.textContent = p;
+    b.addEventListener("click", () => goTo(p));
+    el.appendChild(b);
+    last = p;
+  });
+  const next = document.createElement("button");
+  next.className = "btn ghost small";
+  next.textContent = t("pageNext") + " ›";
+  next.disabled = page >= totalPages;
+  next.addEventListener("click", () => goTo(page + 1));
+  el.appendChild(next);
+  const info = document.createElement("span");
+  info.className = "info";
+  info.textContent = t("pageOf").replace("{p}", page).replace("{t}", totalPages) + " · " + t("pageRange").replace("{a}", start + 1).replace("{b}", end);
+  el.appendChild(info);
 }
 async function loadCompanies() {
   $("#msg").textContent = t("loading");
   try {
     companies = await api.companies();
     $("#msg").textContent = "";
-    renderFilterOptions(); renderStats(); renderList();
+    listPage = 1;
+    renderFilterOptions(); renderStats(); renderList(); syncStickyTop();
   } catch (e) {
     $("#msg").textContent = t("loadFail") + e.message;
   }
 }
 ["q","fPriority","fStage","fFactory","fFormat"].forEach(id => {
-  $("#" + id).addEventListener("input", renderList);
-  $("#" + id).addEventListener("change", renderList);
+  $("#" + id).addEventListener("input", () => { listPage = 1; renderList(); });
+  $("#" + id).addEventListener("change", () => { listPage = 1; renderList(); });
 });
 $("#resetBtn").addEventListener("click", () => {
   $("#q").value = ""; $("#fPriority").value = ""; $("#fStage").value = ""; $("#fFactory").value = ""; $("#fFormat").value = "";
+  listPage = 1;
   renderList();
 });
 
@@ -707,7 +796,7 @@ function closeDetail() {
 }
 $("#closeBtn").addEventListener("click", closeDetail);
 $("#overlay").addEventListener("click", e => { if (e.target.id === "overlay") closeDetail(); });
-document.addEventListener("keydown", e => { if (e.key === "Escape") closeDetail(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") { closeDetail(); closeLeadDetail(); } });
 document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => {
   tab = b.dataset.tab;
   if (current) renderDetail(current, true);
@@ -871,13 +960,18 @@ function renderLeadsStats() {
     `<div class="stat"><b>${n(l => l.status === "new")}</b><span>${esc(t("leadStatNew"))}</span></div>` +
     `<div class="stat"><b>${n(l => l.status === "promoted")}</b><span>${esc(t("leadStatPromoted"))}</span></div>`;
 }
+const LEAD_PAGE_SIZE = 50;
+let leadPage = 1;
 function renderLeads() {
   const list = filteredLeads();
+  const totalPages = Math.max(1, Math.ceil(list.length / LEAD_PAGE_SIZE));
+  if (leadPage > totalPages) leadPage = totalPages;
+  const start = (leadPage - 1) * LEAD_PAGE_SIZE;
   $("#leadsMeta").textContent = t("leadShowing").replace("{n}", leads.length).replace("{m}", list.length);
   const box = $("#leadsList");
   box.innerHTML = "";
   $("#leadsEmpty").classList.toggle("hidden", list.length > 0);
-  list.slice(0, 200).forEach(l => {
+  list.slice(start, start + LEAD_PAGE_SIZE).forEach(l => {
     const d = document.createElement("div");
     d.className = "lrow";
     const busy = leadBusy === l.id;
@@ -893,17 +987,76 @@ function renderLeads() {
         `<button type="button" class="btn small" data-promote="${esc(l.id)}" ${done || busy ? "disabled" : ""}>${esc(t("leadPromote"))}</button>` +
         `<button type="button" class="btn ghost small" data-reject="${esc(l.id)}" ${done || busy ? "disabled" : ""}>${esc(t("leadReject"))}</button>` +
       `</span>`;
-    d.querySelector("[data-promote]").addEventListener("click", () => promoteLead(l));
-    d.querySelector("[data-reject]").addEventListener("click", () => rejectLead(l));
+    d.querySelector("[data-promote]").addEventListener("click", e => { e.stopPropagation(); promoteLead(l); });
+    d.querySelector("[data-reject]").addEventListener("click", e => { e.stopPropagation(); rejectLead(l); });
+    d.addEventListener("click", () => openLeadDetail(l));
     box.appendChild(d);
   });
-  if (list.length > 200) {
-    const more = document.createElement("div");
-    more.className = "empty";
-    more.textContent = "… +" + (list.length - 200);
-    box.appendChild(more);
-  }
+  renderPager($("#leadPager"), leadPage, totalPages, list.length, start, LEAD_PAGE_SIZE, p => { leadPage = p; renderLeads(); });
 }
+/* ---------- 名單明細 ---------- */
+const LEAD_FIELD_LABEL = {
+  brand: ["品牌", "Brand"], domain: ["網域", "Domain"], source: ["來源", "Source"],
+  source_id: ["來源編號", "Source ID"], monthly_sales: ["月銷量", "Monthly sales"],
+  monthly_revenue: ["月營收", "Monthly revenue"], revenue_band: ["營收級距", "Revenue band"],
+  tier: ["級別", "Tier"], status: ["狀態", "Status"], dedupe_status: ["去重狀態", "Dedupe status"],
+  matched_company_id: ["已晉升品牌", "Promoted company"], date_sc: ["抓取日", "Scraped on"],
+  created_at: ["建立日", "Created"], updated_at: ["更新日", "Updated"],
+};
+function leadFieldVal(l, f) {
+  const v = l[f];
+  if (v == null || v === "") return "—";
+  if (f === "monthly_revenue") return esc(fmtMoney(v));
+  if (f === "monthly_sales") return esc(fmtInt(v));
+  if (f === "status") return esc(leadStatusLabel(v));
+  if (f === "matched_company_id") {
+    const c = companies.find(x => x.id === v);
+    return c ? esc(c.name) + "（" + esc(c.domain || "") + "）" : esc(String(v));
+  }
+  if (typeof v === "string" && /^https?:\/\//.test(v)) return `<a href="${esc(v)}" target="_blank" rel="noopener">${esc(v)}</a>`;
+  return esc(String(v));
+}
+function openLeadDetail(l) {
+  currentLead = l;
+  $("#ldName").textContent = l.brand || t("untitled");
+  $("#ldDomain").textContent = l.domain || "";
+  $("#ldTags").innerHTML =
+    `<span class="tag b">${esc(bandShort(l.revenue_band))}</span> ` +
+    `<span class="tag ${leadStatusTag(l.status)}">${esc(leadStatusLabel(l.status))}</span> ` +
+    `<span class="tag">${esc(l.source || "")}</span>`;
+  let html = `<dl class="kv">`;
+  Object.keys(LEAD_FIELD_LABEL).forEach(f => {
+    const label = LEAD_FIELD_LABEL[f][lang === "en" ? 1 : 0];
+    html += `<dt>${esc(label)}</dt><dd>${leadFieldVal(l, f)}</dd>`;
+  });
+  html += `</dl>`;
+  $("#ldBody").innerHTML = html;
+  const done = l.status === "promoted" || l.status === "rejected";
+  $("#ldPromoteBtn").disabled = done || leadBusy === l.id;
+  $("#ldRejectBtn").disabled = done || leadBusy === l.id;
+  $("#ldMsg").textContent = "";
+  $("#leadOverlay").classList.remove("hidden");
+}
+function closeLeadDetail() {
+  $("#leadOverlay").classList.add("hidden");
+  currentLead = null;
+}
+$("#ldCloseBtn").addEventListener("click", closeLeadDetail);
+$("#leadOverlay").addEventListener("click", e => { if (e.target.id === "leadOverlay") closeLeadDetail(); });
+$("#ldPromoteBtn").addEventListener("click", async () => {
+  if (!currentLead) return;
+  const l = currentLead;
+  await promoteLead(l);
+  if (l.status === "promoted") closeLeadDetail();
+  else if (currentLead) openLeadDetail(l);
+});
+$("#ldRejectBtn").addEventListener("click", async () => {
+  if (!currentLead) return;
+  const l = currentLead;
+  await rejectLead(l);
+  if (l.status === "rejected") closeLeadDetail();
+  else if (currentLead) openLeadDetail(l);
+});
 function setLeadsMsg(text, kind) {
   const el = $("#leadsMsg");
   el.textContent = text;
@@ -914,6 +1067,7 @@ async function loadLeads() {
   try {
     leads = await api.leads();
     leadsLoaded = true;
+    leadPage = 1;
     setLeadsMsg("", "muted");
     renderLeadsStats(); renderLeads();
   } catch (e) {
@@ -965,11 +1119,12 @@ async function rejectLead(lead) {
   }
 }
 ["lq","fBand","fTier","fStatus"].forEach(id => {
-  $("#" + id).addEventListener("input", renderLeads);
-  $("#" + id).addEventListener("change", renderLeads);
+  $("#" + id).addEventListener("input", () => { leadPage = 1; renderLeads(); });
+  $("#" + id).addEventListener("change", () => { leadPage = 1; renderLeads(); });
 });
 $("#lResetBtn").addEventListener("click", () => {
   $("#lq").value = ""; $("#fBand").value = ""; $("#fTier").value = ""; $("#fStatus").value = "";
+  leadPage = 1;
   renderLeads();
 });
 
