@@ -700,12 +700,12 @@ function renderList() {
     const d = document.createElement("div");
     d.className = "row";
     d.innerHTML =
-      `<span><span class="nm">${esc(c.name || t("untitled"))}</span><br><span class="dm">${esc(c.domain || "")}</span></span>` +
+      `<span><span class="nm">${esc(c.name || t("untitled"))}</span><br><span class="dm">${c.domain ? domainLink(c.domain) : ""}</span></span>` +
       `<span><span class="tag ${c.priority === "A" ? "a" : "b"}">${esc(c.priority || "")}</span></span>` +
       `<span>${esc(stageLabel(c.stage || ""))}</span>` +
       `<span>${esc(c.factory || "")}</span>` +
       `<span class="dm">${esc(c.contact || "")}</span>`;
-    d.addEventListener("click", () => openDetail(c));
+    d.addEventListener("click", e => { if (e.target.closest("a")) return; openDetail(c); });
     box.appendChild(d);
   });
   renderPager($("#pager"), listPage, totalPages, list.length, start, PAGE_SIZE, p => { listPage = p; renderList(); });
@@ -776,16 +776,22 @@ $("#resetBtn").addEventListener("click", () => {
 });
 
 /* ---------- 明細 ---------- */
+const domainLink = d => {
+  if (!d) return "—";
+  const url = /^https?:\/\//i.test(d) ? d : "https://" + d;
+  return `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(d)}</a>`;
+};
 function fieldVal(c, f) {
   const v = c[f];
   if (v == null || v === "") return "—";
+  if (f === "domain") return domainLink(v);
   if (isUrl(v)) return `<a href="${esc(v)}" target="_blank" rel="noopener">${esc(v)}</a>`;
   return esc(v);
 }
 function renderDetail(c, keepTab) {
   current = c;
   $("#dName").textContent = c.name || t("untitled");
-  $("#dDomain").textContent = c.domain || "";
+  $("#dDomain").innerHTML = c.domain ? domainLink(c.domain) : "";
   $("#dTags").innerHTML =
     `<span class="tag ${c.priority === "A" ? "a" : "b"}">${esc(c.priority || "")}</span> ` +
     `<span class="tag">${esc(stageLabel(c.stage || ""))}</span> ` +
@@ -1001,7 +1007,7 @@ function renderLeads() {
     const busy = leadBusy === l.id;
     const done = l.status === "promoted" || l.status === "rejected";
     d.innerHTML =
-      `<span><span class="nm">${esc(l.brand || t("untitled"))}</span>${l.domain ? `<br><span class="dm">${esc(l.domain)}</span>` : ""}</span>` +
+      `<span><span class="nm">${esc(l.brand || t("untitled"))}</span>${l.domain ? `<br><span class="dm">${domainLink(l.domain)}</span>` : ""}</span>` +
       `<span class="num" data-l="${esc(t("colRevenue"))}">${esc(fmtMoney(l.monthly_revenue))}</span>` +
       `<span class="num" data-l="${esc(t("colSales"))}">${esc(fmtInt(l.monthly_sales))}</span>` +
       `<span data-l="${esc(t("colBand"))}"><span class="tag b">${esc(bandShort(l.revenue_band))}</span></span>` +
@@ -1013,7 +1019,7 @@ function renderLeads() {
       `</span>`;
     d.querySelector("[data-promote]").addEventListener("click", e => { e.stopPropagation(); promoteLead(l); });
     d.querySelector("[data-reject]").addEventListener("click", e => { e.stopPropagation(); rejectLead(l); });
-    d.addEventListener("click", () => openLeadDetail(l));
+    d.addEventListener("click", e => { if (e.target.closest("a")) return; openLeadDetail(l); });
     box.appendChild(d);
   });
   renderPager($("#leadPager"), leadPage, totalPages, list.length, start, LEAD_PAGE_SIZE, p => { leadPage = p; renderLeads(); });
@@ -1033,9 +1039,10 @@ function leadFieldVal(l, f) {
   if (f === "monthly_revenue") return esc(fmtMoney(v));
   if (f === "monthly_sales") return esc(fmtInt(v));
   if (f === "status") return esc(leadStatusLabel(v));
+  if (f === "domain") return domainLink(v);
   if (f === "matched_company_id") {
     const c = companies.find(x => x.id === v);
-    return c ? esc(c.name) + "（" + esc(c.domain || "") + "）" : esc(String(v));
+    return c ? esc(c.name) + "（" + domainLink(c.domain) + "）" : esc(String(v));
   }
   if (typeof v === "string" && /^https?:\/\//.test(v)) return `<a href="${esc(v)}" target="_blank" rel="noopener">${esc(v)}</a>`;
   return esc(String(v));
@@ -1052,7 +1059,7 @@ function openLeadDetail(l) {
   $("#ldSaveBtn").classList.add("hidden");
   $("#ldCancelBtn").classList.add("hidden");
   $("#ldName").textContent = l.brand || t("untitled");
-  $("#ldDomain").textContent = l.domain || "";
+  $("#ldDomain").innerHTML = l.domain ? domainLink(l.domain) : "";
   $("#ldTags").innerHTML =
     `<span class="tag b">${esc(bandShort(l.revenue_band))}</span> ` +
     `<span class="tag ${leadStatusTag(l.status)}">${esc(leadStatusLabel(l.status))}</span> ` +
