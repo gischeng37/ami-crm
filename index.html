@@ -167,6 +167,14 @@ a{color:var(--accent)}
 .ingexpand td{font-size:13px}
 .ingaliasform{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .ingaliasform input{flex:1;min-width:180px}
+/* DSLD 分析（部署 #25；Phase 3：M1 理想客戶候選＋M2 成分情報，唯讀不寫入） */
+.dsldnote{border:1px solid var(--line);border-left:4px solid var(--accent);background:#f7fafc;border-radius:8px;padding:10px 12px;font-size:14px}
+.dsldchart{width:100%;max-width:720px;height:auto;display:block;margin:4px auto 0}
+.dsldchart text{font-size:20px;fill:var(--ink)}
+.dsldchart .dsldbar{fill:var(--accent)}
+.dsldsort{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:8px 0}
+.dsldsort .btn{min-height:36px}
+.dsldtag{font-size:12px;color:var(--muted)}
 @media (max-width:768px){
   .filters{grid-template-columns:1fr 1fr}
   .filters .full-m{grid-column:1/-1}
@@ -258,6 +266,7 @@ a{color:var(--accent)}
       <button id="viewLeadsBtn" type="button" data-i18n="tabLeads">名單池</button>
       <button id="viewFormulasBtn" type="button" data-i18n="tabFormulas">配方管理</button>
       <button id="viewHotnessBtn" type="button" data-i18n="tabHotness">市場熱度</button>
+      <button id="viewDsldBtn" type="button" data-i18n="tabDsld">DSLD 分析</button>
     </div>
     <div id="dashboardView">
       <div class="card"><div id="dashStats" class="stats"></div></div>
@@ -468,6 +477,79 @@ a{color:var(--accent)}
         <div id="hotEmpty" class="empty hidden" data-i18n="hotEmpty">尚無熱度快照（請先執行 sql-72 種子）。</div>
       </div>
       <p id="hotMsg" class="err"></p>
+    </div>
+    <!-- DSLD 分析（部署 #25；Phase 3：M1 理想客戶候選＋M2 成分情報；唯讀，不寫 Supabase、不寫名單池／主檔、不做品牌間配方對比） -->
+    <div id="dsldView" class="hidden">
+      <div class="card">
+        <div class="stats" id="dsldStats"></div>
+        <div id="dsldSnapshotLine" class="muted" style="margin-top:8px"></div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="dsldM1Title">理想客戶候選</h3>
+        <div class="dsldnote" data-i18n="dsldNoAutoImport">候選只產出、不自動匯入。進名單池／主檔走既有批准制（研究封包、逐項批准）。</div>
+        <p class="muted" style="margin-top:8px" data-i18n="dsldPresetNote">篩選條件：在售 ≥5 款；適配劑型（膠囊／粉劑／軟膠囊）在售占比 ≥50%；至少 1 款適配劑型在售。自有工廠與否不由 DSLD 判定。</p>
+        <div class="lfilters">
+          <div class="full-m"><label data-i18n="dsldSearchBrand">品牌搜尋</label><input id="dsldSearch" type="search" data-i18n-ph="dsldSearchBrandPh" placeholder="品牌名稱，例如 NOW…"></div>
+          <div><label data-i18n="dsldMinProducts">產品數 ≥</label><input id="dsldMinProducts" type="number" min="0" inputmode="numeric"></div>
+          <div><label data-i18n="dsldMaxProducts">產品數 ≤</label><input id="dsldMaxProducts" type="number" min="0" inputmode="numeric"></div>
+          <div><label data-i18n="dsldMinOnMarket">在售數 ≥</label><input id="dsldMinOnMarket" type="number" min="0" inputmode="numeric"></div>
+          <div><label data-i18n="dsldMaxOnMarket">在售數 ≤</label><input id="dsldMaxOnMarket" type="number" min="0" inputmode="numeric"></div>
+          <div><label data-i18n="dsldFormFilter">劑型</label><select id="dsldForm"><option value="" data-i18n="all">全部</option><option value="powder">powder</option><option value="capsule">capsule</option><option value="softgel">softgel</option><option value="tablet">tablet</option><option value="liquid">liquid</option><option value="gummy">gummy</option><option value="lozenge">lozenge</option><option value="bar">bar</option><option value="other">other</option><option value="unknown">unknown</option></select></div>
+          <div><label data-i18n="hotSortBy">排序</label><select id="dsldSort"><option value="on_market" data-i18n="dsldColOnMarket">在售數</option><option value="products" data-i18n="dsldColProducts">產品數</option><option value="brand" data-i18n="dsldSortBrand">品牌（A→Z）</option></select></div>
+          <div><button id="dsldResetBtn" class="btn ghost" type="button" data-i18n="reset">重設</button></div>
+        </div>
+        <p id="dsldRangeErr" class="err"></p>
+      </div>
+      <div class="card" style="padding-top:4px">
+        <div id="dsldMeta" class="muted" style="padding:10px 8px 0"></div>
+        <div class="fxwrap"><table class="fx" id="dsldTable">
+          <thead><tr><th data-i18n="dsldColBrand">品牌</th><th class="num" data-i18n="dsldColProducts">產品數</th><th class="num" data-i18n="dsldColOnMarket">在售數</th>
+          <th class="num" data-i18n="dsldColOffMarket">下架數</th><th data-i18n="dsldColForms">劑型摘要</th><th data-i18n="dsldColReasons">入選原因</th><th data-i18n="dsldColEvidence">證據</th></tr></thead>
+          <tbody id="dsldList"></tbody>
+        </table></div>
+        <div id="dsldEmpty" class="empty hidden" data-i18n="dsldEmpty">沒有符合的候選品牌。</div>
+        <div id="dsldPager" class="pager"></div>
+      </div>
+      <p id="dsldMsg" class="err"></p>
+      <div class="card">
+        <h3 data-i18n="dsldM2FreqTitle">成分頻率 Top 50</h3>
+        <p class="muted" data-i18n="dsldSourceNote">數據來源：NIH DSLD 凍結快照（2026-01-11 版；NIH 自 2025-09 起停更，共 214,780 張標籤）。無銷量／營收數據。</p>
+        <div class="dsldsort"><span class="muted" data-i18n="hotSortBy">排序</span>
+          <button type="button" class="btn small on" data-dsldfreqsort="labels" data-i18n="dsldColLabels">標籤數</button>
+          <button type="button" class="btn small ghost" data-dsldfreqsort="brands" data-i18n="dsldColBrands">品牌數</button>
+        </div>
+        <div id="dsldFreqChart"></div>
+        <div class="fxwrap"><table class="fx" id="dsldFreqTable">
+          <thead><tr><th class="num" data-i18n="hotColRank">排名</th><th data-i18n="dsldColIngredient">成分</th><th class="num" data-i18n="dsldColLabels">標籤數</th><th class="num" data-i18n="dsldColBrands">品牌數</th></tr></thead>
+          <tbody id="dsldFreqList"></tbody>
+        </table></div>
+        <p class="muted" data-i18n="dsldFreqNote">標籤數＝含該成分的不同標籤數；同一標籤以兩種單位列同一成分只計一次。</p>
+        <p class="muted" data-i18n="dsldNoCompareNote">市場級統計，不做品牌間配方對比。</p>
+      </div>
+      <div class="card">
+        <h3 data-i18n="dsldM2DoseTitle">劑量分布</h3>
+        <p class="muted" data-i18n="dsldSourceNote">數據來源：NIH DSLD 凍結快照（2026-01-11 版；NIH 自 2025-09 起停更，共 214,780 張標籤）。無銷量／營收數據。</p>
+        <div class="lfilters">
+          <div class="full-m"><label data-i18n="dsldColIngredient">成分</label><select id="dsldDoseIngredient"></select></div>
+        </div>
+        <div class="fxwrap"><table class="fx" id="dsldDoseTable">
+          <thead><tr><th data-i18n="dsldColUnit">單位</th><th class="num" data-i18n="dsldColLabels">標籤數</th><th class="num" data-i18n="dsldColBrands">品牌數</th><th class="num" data-i18n="dsldColAmountN">劑量筆數</th><th class="num" data-i18n="dsldColMin">最小</th><th class="num" data-i18n="dsldColP25">p25</th><th class="num" data-i18n="dsldColMedian">中位數</th><th class="num" data-i18n="dsldColP75">p75</th><th class="num" data-i18n="dsldColMax">最大</th></tr></thead>
+          <tbody id="dsldDoseList"></tbody>
+        </table></div>
+        <p class="muted" data-i18n="dsldDoseNote">按單位分組呈現，不同單位不換算、不平均；劑量統計只用可解析數值（非數字含量如 &lt;1 不計入）。</p>
+        <p class="muted" data-i18n="dsldNoCompareNote">市場級統計，不做品牌間配方對比。</p>
+      </div>
+      <div class="card">
+        <h3 data-i18n="dsldM2CoTitle">成分共現 Top 20</h3>
+        <p class="muted" data-i18n="dsldSourceNote">數據來源：NIH DSLD 凍結快照（2026-01-11 版；NIH 自 2025-09 起停更，共 214,780 張標籤）。無銷量／營收數據。</p>
+        <div class="fxwrap"><table class="fx" id="dsldCoTable">
+          <thead><tr><th class="num" data-i18n="hotColRank">排名</th><th data-i18n="dsldColIngredientA">成分 A</th><th data-i18n="dsldColIngredientB">成分 B</th><th class="num" data-i18n="dsldColCoLabels">共現標籤數</th><th class="num" data-i18n="dsldColLabels">標籤數</th><th class="num" data-i18n="dsldColLabels">標籤數</th><th class="num" data-i18n="dsldColSupport">占比</th></tr></thead>
+          <tbody id="dsldCoList"></tbody>
+        </table></div>
+        <p class="muted" data-i18n="dsldCoNote">方法：先取出現標籤數 ≥100 的成分，按標籤數取前 100 種，再逐標籤統計兩兩共現；納入計算 146,003 張標籤。</p>
+        <p class="muted" data-i18n="dsldCoMacroNote">calories、total fat、total carbohydrates 等宏量營養素列幾乎出現在每張標籤上，會主導共現榜。</p>
+        <p class="muted" data-i18n="dsldNoCompareNote">市場級統計，不做品牌間配方對比。</p>
+      </div>
     </div>
   </section>
   <p id="msg" class="err"></p>
@@ -700,6 +782,36 @@ const I18N = {
     hotFilterBy:"成分篩選：", hotClearFilter:"✕ 清除篩選",
     hotNoLead:"此品牌尚未進名單池，無法執行此操作。",
     hotStatBrands:"上榜品牌", hotStatDate:"快照日期",
+    /* DSLD 分析（部署 #25；Phase 3：M1＋M2，唯讀） */
+    tabDsld:"DSLD 分析",
+    dsldM1Title:"理想客戶候選",
+    dsldNoAutoImport:"候選只產出、不自動匯入。進名單池／主檔走既有批准制（研究封包、逐項批准）。",
+    dsldPresetNote:"篩選條件：在售 ≥5 款；適配劑型（膠囊／粉劑／軟膠囊）在售占比 ≥50%；至少 1 款適配劑型在售。自有工廠與否不由 DSLD 判定。",
+    dsldSearchBrand:"品牌搜尋", dsldSearchBrandPh:"品牌名稱，例如 NOW…",
+    dsldMinProducts:"產品數 ≥", dsldMaxProducts:"產品數 ≤",
+    dsldMinOnMarket:"在售數 ≥", dsldMaxOnMarket:"在售數 ≤",
+    dsldFormFilter:"劑型",
+    dsldColBrand:"品牌", dsldColProducts:"產品數", dsldColOnMarket:"在售數", dsldColOffMarket:"下架數",
+    dsldColForms:"劑型摘要", dsldColReasons:"入選原因", dsldColEvidence:"證據",
+    dsldEvidenceLink:"DSLD 原始標籤", dsldInPool:"已在名單池",
+    dsldEmpty:"沒有符合的候選品牌。", dsldRangeError:"最小值不可大於最大值。",
+    dsldSortBrand:"品牌（A→Z）",
+    dsldStatTotal:"候選總數", dsldStatInPool:"已有 lead_id", dsldStatMedian:"在售中位數",
+    dsldM2FreqTitle:"成分頻率 Top 50", dsldM2DoseTitle:"劑量分布", dsldM2CoTitle:"成分共現 Top 20",
+    dsldColIngredient:"成分", dsldColIngredientA:"成分 A", dsldColIngredientB:"成分 B",
+    dsldColLabels:"標籤數", dsldColBrands:"品牌數",
+    dsldColUnit:"單位", dsldColAmountN:"劑量筆數",
+    dsldColMin:"最小", dsldColP25:"p25", dsldColMedian:"中位數", dsldColP75:"p75", dsldColMax:"最大",
+    dsldColCoLabels:"共現標籤數", dsldColSupport:"占比",
+    dsldSourceNote:"數據來源：NIH DSLD 凍結快照（2026-01-11 版；NIH 自 2025-09 起停更，共 214,780 張標籤）。無銷量／營收數據。",
+    dsldNoCompareNote:"市場級統計，不做品牌間配方對比。",
+    dsldFreqNote:"標籤數＝含該成分的不同標籤數；同一標籤以兩種單位列同一成分只計一次。",
+    dsldDoseNote:"按單位分組呈現，不同單位不換算、不平均；劑量統計只用可解析數值（非數字含量如 <1 不計入）。",
+    dsldCoNote:"方法：先取出現標籤數 ≥100 的成分，按標籤數取前 100 種，再逐標籤統計兩兩共現；納入計算 146,003 張標籤。",
+    dsldCoMacroNote:"calories、total fat、total carbohydrates 等宏量營養素列幾乎出現在每張標籤上，會主導共現榜。",
+    dsldLoadFail:"DSLD 數據檔未載入，請確認部署已包含 dsld-dashboard-data-v1.json（與 index.html 同目錄）。",
+    dsldShowing:"顯示 {a}–{b}／共 {total} 家（篩選後 {filtered} 家）",
+    dsldSnapshot:"快照 2026-01-11 · 生成於 {ts}",
     googleSearch:"Google 搜尋",
     domainOverwriteConfirm:"網域已有值「{old}」，確定覆寫為「{new}」？"
   },
@@ -861,6 +973,36 @@ const I18N = {
     hotFilterBy:"Ingredient filter:", hotClearFilter:"✕ Clear filter",
     hotNoLead:"This brand is not in the leads pool yet, so this action is unavailable.",
     hotStatBrands:"Ranked brands", hotStatDate:"Snapshot date",
+    /* DSLD Analysis (deployment #25; Phase 3: M1 + M2, read-only) */
+    tabDsld:"DSLD Analysis",
+    dsldM1Title:"Ideal-client candidates",
+    dsldNoAutoImport:"Candidates only — nothing is imported automatically. Adding to the leads pool or master list follows the existing approval flow (research packets, item by item).",
+    dsldPresetNote:"Filter: ≥5 on-market products; eligible forms (capsule / powder / softgel) ≥50% of on-market products; ≥1 eligible on-market product. DSLD cannot tell whether a brand owns a factory.",
+    dsldSearchBrand:"Search brand", dsldSearchBrandPh:"Brand name, e.g. NOW…",
+    dsldMinProducts:"Min. products", dsldMaxProducts:"Max. products",
+    dsldMinOnMarket:"Min. on-market", dsldMaxOnMarket:"Max. on-market",
+    dsldFormFilter:"Form",
+    dsldColBrand:"Brand", dsldColProducts:"Products", dsldColOnMarket:"On market", dsldColOffMarket:"Off market",
+    dsldColForms:"Form mix", dsldColReasons:"Why selected", dsldColEvidence:"Evidence",
+    dsldEvidenceLink:"DSLD label", dsldInPool:"In leads pool",
+    dsldEmpty:"No matching candidates.", dsldRangeError:"Min must not exceed max.",
+    dsldSortBrand:"Brand (A→Z)",
+    dsldStatTotal:"Candidates", dsldStatInPool:"With lead_id", dsldStatMedian:"Median on-market",
+    dsldM2FreqTitle:"Ingredient frequency Top 50", dsldM2DoseTitle:"Dose distribution", dsldM2CoTitle:"Ingredient co-occurrence Top 20",
+    dsldColIngredient:"Ingredient", dsldColIngredientA:"Ingredient A", dsldColIngredientB:"Ingredient B",
+    dsldColLabels:"Labels", dsldColBrands:"Brands",
+    dsldColUnit:"Unit", dsldColAmountN:"Dose rows",
+    dsldColMin:"Min", dsldColP25:"p25", dsldColMedian:"Median", dsldColP75:"p75", dsldColMax:"Max",
+    dsldColCoLabels:"Co-occurring labels", dsldColSupport:"Share",
+    dsldSourceNote:"Source: NIH DSLD frozen snapshot (2026-01-11 dump; NIH stopped adding labels in Sep 2025; 214,780 labels). No sales or revenue data.",
+    dsldNoCompareNote:"Market-level statistics only — no brand-to-brand formula comparison.",
+    dsldFreqNote:"Labels = distinct labels containing the ingredient; a label listing it under two units counts once.",
+    dsldDoseNote:"Grouped by unit — units are never converted or averaged; dose stats use numeric amounts only (non-numeric amounts such as <1 are excluded).",
+    dsldCoNote:"Method: ingredients appearing on ≥100 labels, top 100 by label count, then pairwise co-occurrence per label; 146,003 labels considered.",
+    dsldCoMacroNote:"Macronutrient rows such as calories, total fat and total carbohydrates appear on nearly every label and dominate this list.",
+    dsldLoadFail:"DSLD data file failed to load. Check that dsld-dashboard-data-v1.json is deployed next to index.html.",
+    dsldShowing:"Showing {a}–{b} of {total} ({filtered} after filters)",
+    dsldSnapshot:"Snapshot 2026-01-11 · generated {ts}",
     googleSearch:"Google search",
     domainOverwriteConfirm:"Domain already has “{old}”. Overwrite it with “{new}”?"
   }
@@ -1079,6 +1221,7 @@ function applyLang() {
   if (mainViewTab === "dashboard") renderDashboard();
   if (mainViewTab === "formulas") { renderFormulas(); if (fxSubTab === "ingredients") { renderIngredients(); const ipm = $("#ingProposalMsg"); if (ipm) ipm.textContent = ""; } }
   if (mainViewTab === "hotness") renderHotness();
+  if (mainViewTab === "dsld") renderDsld();
   syncStickyTop();
 }
 $("#langBtn").addEventListener("click", () => {
@@ -1574,20 +1717,24 @@ function showMainTab(which) {
   $("#leadsView").classList.toggle("hidden", which !== "leads");
   $("#formulasView").classList.toggle("hidden", which !== "formulas");
   $("#hotnessView").classList.toggle("hidden", which !== "hotness");
+  $("#dsldView").classList.toggle("hidden", which !== "dsld");
   $("#viewDashboardBtn").classList.toggle("on", which === "dashboard");
   $("#viewCompaniesBtn").classList.toggle("on", which === "companies");
   $("#viewLeadsBtn").classList.toggle("on", which === "leads");
   $("#viewFormulasBtn").classList.toggle("on", which === "formulas");
   $("#viewHotnessBtn").classList.toggle("on", which === "hotness");
+  $("#viewDsldBtn").classList.toggle("on", which === "dsld");
   if (which === "leads" && !leadsLoaded) loadLeads();
   if (which === "dashboard") renderDashboard();
   if (which === "formulas") { if (!fxLoaded) loadFormulas(); else renderFormulas(); if (fxSubTab === "ingredients") { if (!ingLoaded) loadIngredients(); else renderIngredients(); } }
   if (which === "hotness") { if (!hotLoaded) loadHotness(); else renderHotness(); }
+  if (which === "dsld") { if (!dsldLoaded) loadDsld(); else renderDsld(); }
 }
 $("#viewCompaniesBtn").addEventListener("click", () => showMainTab("companies"));
 $("#viewLeadsBtn").addEventListener("click", () => showMainTab("leads"));
 $("#viewFormulasBtn").addEventListener("click", () => showMainTab("formulas"));
 $("#viewHotnessBtn").addEventListener("click", () => showMainTab("hotness"));
+$("#viewDsldBtn").addEventListener("click", () => showMainTab("dsld"));
 $("#dashGoHotness").addEventListener("click", () => showMainTab("hotness"));
 $("#viewDashboardBtn").addEventListener("click", () => showMainTab("dashboard"));
 $("#dashGoCompanies").addEventListener("click", () => showMainTab("companies"));
@@ -3113,6 +3260,223 @@ document.querySelectorAll("[data-hotsort]").forEach(b => b.addEventListener("cli
   renderHotness();
 }));
 $("#hotFilterClearBtn").addEventListener("click", () => { hotIngFilter = null; renderHotness(); });
+
+/* ---------- DSLD 分析（部署 #25；Phase 3：M1 理想客戶候選＋M2 成分情報；唯讀，不寫 Supabase、不寫名單池／主檔） ---------- */
+const DSLD_DATA_URL = "dsld-dashboard-data-v1.json";
+const DSLD_PAGE_SIZE = 50;
+const DSLD_FORM_TITLE = { powder:"Powder", capsule:"Capsule", softgel:"Softgel", tablet:"Tablet", liquid:"Liquid", gummy:"Gummy", lozenge:"Lozenge", bar:"Bar", other:"Other", unknown:"Unknown" };
+let dsldData = null;
+let dsldLoaded = false;
+let dsldLoadPromise = null;
+let dsldLoadErr = null;
+let dsldPage = 1;
+let dsldSort = "on_market"; /* on_market | products | brand */
+let dsldFreqSort = "labels"; /* labels | brands */
+let dsldDoseIngredient = null;
+let dsldSearchTimer = null;
+const dsldFmtDose = v => v == null || v === "" ? "—" : (Number.isInteger(Number(v)) ? fmtInt(v) : String(Number(v)));
+function dsldMedian(nums) {
+  if (!nums.length) return null;
+  const s = [...nums].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+function dsldFormSummary(forms) {
+  const parts = [], titles = [];
+  Object.entries(forms || {}).forEach(([k, v]) => {
+    if (v > 0) { parts.push(k + " " + fmtInt(v)); titles.push((DSLD_FORM_TITLE[k] || k) + ": " + fmtInt(v)); }
+  });
+  return { text: parts.length ? parts.join("／") : "—", title: titles.join(", ") };
+}
+function dsldReadRange() {
+  const num = id => { const v = $(id).value.trim(); if (v === "") return null; const n = Number(v); return Number.isFinite(n) ? n : null; };
+  return { minP: num("#dsldMinProducts"), maxP: num("#dsldMaxProducts"), minO: num("#dsldMinOnMarket"), maxO: num("#dsldMaxOnMarket") };
+}
+function dsldFiltered() {
+  const rows = dsldData ? (dsldData.m1_ideal_clients || []) : [];
+  const q = $("#dsldSearch").value.trim().toLowerCase();
+  const form = $("#dsldForm").value;
+  const r = dsldReadRange();
+  const rangeBad = (r.minP != null && r.maxP != null && r.minP > r.maxP) || (r.minO != null && r.maxO != null && r.minO > r.maxO);
+  let list = [...rows];
+  if (!rangeBad) {
+    if (q) list = list.filter(x => String(x.brand || "").toLowerCase().includes(q));
+    if (r.minP != null) list = list.filter(x => (x.products || 0) >= r.minP);
+    if (r.maxP != null) list = list.filter(x => (x.products || 0) <= r.maxP);
+    if (r.minO != null) list = list.filter(x => (x.on_market || 0) >= r.minO);
+    if (r.maxO != null) list = list.filter(x => (x.on_market || 0) <= r.maxO);
+    if (form) list = list.filter(x => ((x.forms || {})[form] || 0) > 0);
+  }
+  if (dsldSort === "products") list.sort((a, b) => (b.products || 0) - (a.products || 0) || (b.on_market || 0) - (a.on_market || 0) || String(a.brand || "").localeCompare(String(b.brand || "")));
+  else if (dsldSort === "brand") list.sort((a, b) => String(a.brand || "").localeCompare(String(b.brand || "")));
+  else list.sort((a, b) => (b.on_market || 0) - (a.on_market || 0) || (b.products || 0) - (a.products || 0) || String(a.brand || "").localeCompare(String(b.brand || "")));
+  return { list, rangeBad };
+}
+function dsldFreqChartSvg(sorted) {
+  const top = sorted.slice(0, 15);
+  if (!top.length) return "";
+  const key = dsldFreqSort === "brands" ? "brands" : "labels";
+  const max = Math.max(...top.map(x => x[key] || 0), 1);
+  const rowH = 34, barH = 20, labelW = 205, barMax = 330;
+  const h = 12 + top.length * rowH + 8;
+  let s = `<svg class="dsldchart" viewBox="0 0 640 ${h}" role="img" aria-label="${esc(t("dsldM2FreqTitle"))} Top 15"><title>${esc(t("dsldM2FreqTitle"))} Top 15</title>`;
+  top.forEach((x, i) => {
+    const y = 12 + i * rowH, v = x[key] || 0;
+    const w = Math.max(2, Math.round(v / max * barMax));
+    const name = String(x.ingredient_norm || "");
+    const label = name.length > 17 ? name.slice(0, 17) + "…" : name;
+    s += `<text x="0" y="${y + 15}">${esc(label)}</text>` +
+      `<rect class="dsldbar" x="${labelW}" y="${y}" width="${w}" height="${barH}" rx="3"><title>${esc(name)}: ${fmtInt(v)}</title></rect>` +
+      `<text x="${labelW + w + 8}" y="${y + 15}">${fmtInt(v)}</text>`;
+  });
+  return s + "</svg>";
+}
+function renderDsld() {
+  const statsEl = $("#dsldStats"), snapEl = $("#dsldSnapshotLine"), metaEl = $("#dsldMeta"),
+    box = $("#dsldList"), emptyEl = $("#dsldEmpty"), msgEl = $("#dsldMsg");
+  if (!statsEl || !box) return;
+  const freqBox = $("#dsldFreqList"), doseBox = $("#dsldDoseList"), coBox = $("#dsldCoList"), chartBox = $("#dsldFreqChart");
+  if (dsldLoadErr) {
+    statsEl.innerHTML = "";
+    if (snapEl) snapEl.textContent = "";
+    metaEl.textContent = "";
+    box.innerHTML = "";
+    $("#dsldPager").innerHTML = "";
+    emptyEl.classList.remove("hidden");
+    emptyEl.textContent = t("dsldLoadFail");
+    if (msgEl) msgEl.textContent = t("dsldLoadFail");
+    if (chartBox) chartBox.innerHTML = "";
+    if (freqBox) freqBox.innerHTML = `<tr><td colspan="4" class="muted">${esc(t("dsldLoadFail"))}</td></tr>`;
+    if (doseBox) doseBox.innerHTML = `<tr><td colspan="9" class="muted">${esc(t("dsldLoadFail"))}</td></tr>`;
+    if (coBox) coBox.innerHTML = `<tr><td colspan="7" class="muted">${esc(t("dsldLoadFail"))}</td></tr>`;
+    return;
+  }
+  if (!dsldLoaded || !dsldData) {
+    metaEl.textContent = t("loading");
+    return;
+  }
+  if (msgEl) msgEl.textContent = "";
+  const m1 = dsldData.m1_ideal_clients || [];
+  const withLead = m1.filter(r => r.lead_id).length;
+  const med = dsldMedian(m1.map(r => r.on_market || 0));
+  statsEl.innerHTML =
+    `<div class="stat"><b>${fmtInt(m1.length)}</b><span>${esc(t("dsldStatTotal"))}</span></div>` +
+    `<div class="stat"><b>${fmtInt(withLead)}</b><span>${esc(t("dsldStatInPool"))}</span></div>` +
+    `<div class="stat"><b>${med == null ? "—" : dsldFmtDose(med)}</b><span>${esc(t("dsldStatMedian"))}</span></div>`;
+  const meta = dsldData.meta || {};
+  if (snapEl) snapEl.textContent = t("dsldSnapshot").replace("{ts}", meta.generated_at_utc || "—");
+  /* M1：篩選／排序／分頁 */
+  const { list, rangeBad } = dsldFiltered();
+  const rangeEl = $("#dsldRangeErr");
+  if (rangeEl) rangeEl.textContent = rangeBad ? t("dsldRangeError") : "";
+  const totalPages = Math.max(1, Math.ceil(list.length / DSLD_PAGE_SIZE));
+  if (dsldPage > totalPages) dsldPage = totalPages;
+  const start = (dsldPage - 1) * DSLD_PAGE_SIZE;
+  const pageRows = list.slice(start, start + DSLD_PAGE_SIZE);
+  metaEl.textContent = list.length
+    ? t("dsldShowing").replace("{a}", fmtInt(start + 1)).replace("{b}", fmtInt(Math.min(list.length, start + DSLD_PAGE_SIZE))).replace("{total}", fmtInt(m1.length)).replace("{filtered}", fmtInt(list.length))
+    : "";
+  emptyEl.classList.toggle("hidden", list.length > 0);
+  if (!list.length) emptyEl.textContent = t("dsldEmpty");
+  box.innerHTML = pageRows.map(r => {
+    const fs = dsldFormSummary(r.forms);
+    const ev = r.evidence;
+    const evHtml = ev && ev.dsld_id
+      ? `<a href="${esc(ev.url || ("https://dsld.od.nih.gov/label/" + ev.dsld_id))}" target="_blank" rel="noopener" title="${esc(ev.product || t("dsldEvidenceLink"))}">${esc(ev.product ? (ev.product.length > 28 ? ev.product.slice(0, 28) + "…" : ev.product) : t("dsldEvidenceLink"))}</a>`
+      : "—";
+    return "<tr>" +
+      `<td><b>${esc(r.brand || t("untitled"))}</b>` +
+      (r.lead_id ? ` <span class="tag green">${esc(t("dsldInPool"))}</span><br><span class="dsldtag">${esc(r.lead_id)}</span>` : "") + "</td>" +
+      `<td class="num">${fmtInt(r.products)}</td>` +
+      `<td class="num">${fmtInt(r.on_market)}</td>` +
+      `<td class="num">${fmtInt(r.off_market)}</td>` +
+      `<td title="${esc(fs.title)}">${esc(fs.text)}</td>` +
+      `<td>${esc((r.reasons || []).join("；"))}</td>` +
+      `<td>${evHtml}</td></tr>`;
+  }).join("");
+  renderPager($("#dsldPager"), dsldPage, totalPages, list.length, start, DSLD_PAGE_SIZE, p => { dsldPage = p; renderDsld(); });
+  /* M2：頻率（表＋圖同源） */
+  document.querySelectorAll("[data-dsldfreqsort]").forEach(b => {
+    const on = b.dataset.dsldfreqsort === dsldFreqSort;
+    b.classList.toggle("on", on);
+    b.classList.toggle("ghost", !on);
+  });
+  const freq = [...(dsldData.m2_frequency_top50 || [])].sort((a, b) => (b[dsldFreqSort] || 0) - (a[dsldFreqSort] || 0));
+  if (chartBox) chartBox.innerHTML = dsldFreqChartSvg(freq);
+  if (freqBox) freqBox.innerHTML = freq.map((x, i) =>
+    `<tr><td class="num">${i + 1}</td><td>${esc(x.ingredient_norm || "")}</td><td class="num">${fmtInt(x.labels)}</td><td class="num">${fmtInt(x.brands)}</td></tr>`
+  ).join("");
+  /* M2：劑量（按單位分組，不混算） */
+  const doseSel = $("#dsldDoseIngredient");
+  const doseArr = dsldData.m2_dose_top10 || [];
+  if (doseSel && !doseSel.options.length) {
+    doseArr.forEach(x => { const o = document.createElement("option"); o.value = x.ingredient_norm; o.textContent = x.ingredient_norm; doseSel.appendChild(o); });
+  }
+  if (!dsldDoseIngredient && doseArr.length) dsldDoseIngredient = doseArr[0].ingredient_norm;
+  if (doseSel) doseSel.value = dsldDoseIngredient || "";
+  const doseRow = doseArr.find(x => x.ingredient_norm === dsldDoseIngredient);
+  if (doseBox) doseBox.innerHTML = doseRow ? (doseRow.units || []).map(u =>
+    `<tr><td>${esc(u.unit || "")}</td><td class="num">${fmtInt(u.labels)}</td><td class="num">${fmtInt(u.brands)}</td><td class="num">${fmtInt(u.amount_n)}</td>` +
+    `<td class="num">${dsldFmtDose(u.amount_min)}</td><td class="num">${dsldFmtDose(u.amount_p25)}</td><td class="num">${dsldFmtDose(u.amount_median)}</td><td class="num">${dsldFmtDose(u.amount_p75)}</td><td class="num">${dsldFmtDose(u.amount_max)}</td></tr>`
+  ).join("") : "";
+  /* M2：共現 */
+  if (coBox) coBox.innerHTML = (dsldData.m2_cooccurrence_top20 || []).map((x, i) =>
+    `<tr><td class="num">${i + 1}</td><td>${esc(x.ingredient_a || "")}</td><td>${esc(x.ingredient_b || "")}</td>` +
+    `<td class="num">${fmtInt(x.co_labels)}</td><td class="num">${fmtInt(x.labels_a)}</td><td class="num">${fmtInt(x.labels_b)}</td>` +
+    `<td class="num">${x.support_pct == null ? "—" : Number(x.support_pct).toFixed(2) + "%"}</td></tr>`
+  ).join("");
+}
+async function loadDsld() {
+  if (dsldLoadPromise) return dsldLoadPromise;
+  const self = (async () => {
+    try {
+      const res = await fetch(DSLD_DATA_URL);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const d = await res.json();
+      if (!Array.isArray(d.m1_ideal_clients) || !Array.isArray(d.m2_frequency_top50) ||
+          !Array.isArray(d.m2_dose_top10) || !Array.isArray(d.m2_cooccurrence_top20)) {
+        throw new Error("bad shape");
+      }
+      dsldData = d;
+      dsldLoaded = true;
+      dsldLoadErr = null;
+      dsldPage = 1;
+      renderDsld();
+    } catch (e) {
+      dsldData = null;
+      dsldLoaded = false;
+      dsldLoadErr = e;
+      renderDsld();
+    } finally {
+      if (dsldLoadPromise === self) dsldLoadPromise = null;
+    }
+  })();
+  dsldLoadPromise = self;
+  return self;
+}
+$("#dsldSearch").addEventListener("input", () => {
+  clearTimeout(dsldSearchTimer);
+  dsldSearchTimer = setTimeout(() => { dsldPage = 1; renderDsld(); }, 200);
+});
+["#dsldMinProducts", "#dsldMaxProducts", "#dsldMinOnMarket", "#dsldMaxOnMarket"].forEach(id => {
+  $(id).addEventListener("input", () => { dsldPage = 1; renderDsld(); });
+});
+$("#dsldForm").addEventListener("change", () => { dsldPage = 1; renderDsld(); });
+$("#dsldSort").addEventListener("change", e => { dsldSort = e.target.value; dsldPage = 1; renderDsld(); });
+$("#dsldResetBtn").addEventListener("click", () => {
+  $("#dsldSearch").value = "";
+  ["#dsldMinProducts", "#dsldMaxProducts", "#dsldMinOnMarket", "#dsldMaxOnMarket"].forEach(id => { $(id).value = ""; });
+  $("#dsldForm").value = "";
+  $("#dsldSort").value = "on_market";
+  dsldSort = "on_market";
+  dsldPage = 1;
+  renderDsld();
+});
+document.querySelectorAll("[data-dsldfreqsort]").forEach(b => b.addEventListener("click", () => {
+  dsldFreqSort = b.dataset.dsldfreqsort;
+  renderDsld();
+}));
+$("#dsldDoseIngredient").addEventListener("change", e => { dsldDoseIngredient = e.target.value; renderDsld(); });
 
 /* ---------- 產品與配方（crm_products／crm_formula_ingredients／crm_product_labels） ---------- */
 let labelObjectUrls = [];
