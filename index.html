@@ -759,7 +759,20 @@ const api = {
   add: (table, body) => sb("/rest/v1/" + table, { method: "POST", headers: headers(true), body: JSON.stringify(body) }),
   del: (table, id) => sb("/rest/v1/" + table + "?id=eq." + encodeURIComponent(id), { method: "DELETE", headers: headers(true) }),
   /* 名單池：所有呼叫一律帶 headers()（GET 缺 header 會 401 並被登出，見 commit 6af06fd） */
-  leads: () => sb("/rest/v1/crm_leads?select=*&order=monthly_revenue.desc&limit=1000", { headers: headers() }),
+  /* 分頁載入（部署 #20）：池子已破 1,000 筆，單次 limit=1000 會截斷（DSLD 品牌無營收排最後、完全看不到）；
+     逐頁抓直到某頁不滿 1,000 筆為止，全部串接成一個陣列回傳，前端篩選／分頁／統計沿用 leads 陣列 */
+  leads: async () => {
+    const all = [];
+    let offset = 0;
+    for (;;) {
+      const page = await sb("/rest/v1/crm_leads?select=*&order=monthly_revenue.desc&limit=1000&offset=" + offset, { headers: headers() });
+      if (!Array.isArray(page) || page.length === 0) break;
+      all.push(...page);
+      if (page.length < 1000) break;
+      offset += page.length;
+    }
+    return all;
+  },
   addCompany: body => sb("/rest/v1/crm_companies", { method: "POST", headers: headers(true), body: JSON.stringify(body) }),
   addLeadsBulk: body => sb("/rest/v1/crm_leads", { method: "POST", headers: headers(true), body: JSON.stringify(body) }),
   patchLead: (id, body) => sb("/rest/v1/crm_leads?id=eq." + encodeURIComponent(id), { method: "PATCH", headers: headers(true), body: JSON.stringify(body) }),
