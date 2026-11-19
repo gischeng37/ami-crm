@@ -118,6 +118,23 @@ a{color:var(--accent)}
 .lrow .dm{color:var(--muted);font-size:13px;word-break:break-all}
 .lrow .num{font-variant-numeric:tabular-nums;white-space:nowrap}
 .lrow .acts{display:flex;gap:6px;flex-wrap:wrap}
+/* 市場熱度（部署 #23；設計 v1.0） */
+.hsort{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.hsort .btn{min-height:44px}
+.hsort .btn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.hrow{display:grid;grid-template-columns:.35fr 1.4fr .6fr .6fr .8fr 1.6fr .9fr .6fr .7fr 1.5fr;gap:10px;align-items:center;padding:12px 8px;border-bottom:1px solid var(--line)}
+.hrow:hover{background:#f7fafc}
+.hrow.head{font-size:12px;color:var(--muted);cursor:default;background:none;font-weight:700}
+.hrow .nm{font-weight:700;cursor:pointer}
+.hrow .num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.hrow .acts{display:flex;gap:6px;flex-wrap:wrap}
+.hrow .acts .btn{min-height:44px}
+.hrow .score{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
+.ingchip{border:1px solid var(--line);background:#eef6fb;border-radius:999px;padding:4px 10px;font:inherit;font-size:13px;cursor:pointer;min-height:30px;margin:2px 2px 2px 0}
+.ingchip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.ingchip:hover{border-color:var(--accent)}
+.hotfilter{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.hotfilter .btn{min-height:44px}
 /* 新增名單按日期統計（部署 #22，設計 v1.0）：統計列沿用 .lrow 行樣式概念，整行是按鈕 */
 .dshead{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .dsgran{display:flex;gap:6px;flex-wrap:wrap}
@@ -148,6 +165,10 @@ a{color:var(--accent)}
   .lrow{grid-template-columns:1fr 1fr;row-gap:4px}
   .lrow.head{display:none}
   .lrow .acts{grid-column:1/-1}
+  .hrow{grid-template-columns:1fr 1fr;row-gap:4px}
+  .hrow.head{display:none}
+  .hrow .acts{grid-column:1/-1}
+  .hrow [data-l]::before{content:attr(data-l) "：";color:var(--muted);font-size:12px}
   .dsrow{grid-template-columns:1fr 1fr;row-gap:4px}
   .dsrow .dssrc{grid-column:1/-1}
   .lrow [data-l]::before{content:attr(data-l) "：";color:var(--muted);font-size:12px}
@@ -165,6 +186,7 @@ a{color:var(--accent)}
   .stat b{font-size:19px}
   .bfgrid{grid-template-columns:1fr 1fr}
   .dsrow{grid-template-columns:1fr;border:1px solid var(--line);border-radius:8px;margin:8px 0;padding:10px 12px}
+  .hrow{grid-template-columns:1fr;border:1px solid var(--line);border-radius:8px;margin:8px 0;padding:10px 12px}
   .dsrange{flex-direction:column;align-items:stretch}
 }
 </style>
@@ -216,6 +238,7 @@ a{color:var(--accent)}
       <button id="viewCompaniesBtn" type="button" data-i18n="tabCompanies">品牌主檔</button>
       <button id="viewLeadsBtn" type="button" data-i18n="tabLeads">名單池</button>
       <button id="viewFormulasBtn" type="button" data-i18n="tabFormulas">配方管理</button>
+      <button id="viewHotnessBtn" type="button" data-i18n="tabHotness">市場熱度</button>
     </div>
     <div id="dashboardView">
       <div class="card"><div id="dashStats" class="stats"></div></div>
@@ -242,6 +265,7 @@ a{color:var(--accent)}
       </div>
       <div class="card"><h3 data-i18n="dashQueue">待辦佇列</h3><div id="dashQueue"><span class="muted">載入中…</span></div></div>
       <div class="card"><h3 data-i18n="fxDashTitle">配方完整度</h3><div id="fxDashStats" class="stats"></div><div id="fxDashDist" style="margin-top:8px"></div></div>
+      <div class="card"><h3 data-i18n="hotDashTitle">本週最熱 Top 5</h3><div id="hotDashList"><span class="muted" data-i18n="loading">載入中…</span></div><div style="margin-top:10px"><button id="dashGoHotness" class="btn ghost" type="button" data-i18n="hotDashGo">前往市場熱度</button></div></div>
       <div class="card"><h3 data-i18n="dashFunnel">開發漏斗</h3><div id="dashFunnel"></div></div>
       <div class="card"><h3 data-i18n="dashRecent">最新研究紀錄</h3><div id="dashRecent"></div></div>
       <div class="card"><div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -360,6 +384,28 @@ a{color:var(--accent)}
         <div id="fxEmpty" class="empty hidden" data-i18n="fxEmpty">沒有符合的產品。</div>
       </div>
       <p id="fxMsg" class="err"></p>
+    </div>
+    <!-- 市場熱度（部署 #23；設計 v1.0：熱度分數 v1 只看 B 訊號在售產品數，A 評論／C 搜尋量／D 新品速度待補，缺訊號顯示「待補」不填零） -->
+    <div id="hotnessView" class="hidden">
+      <div class="card">
+        <div class="stats" id="hotStats"></div>
+      </div>
+      <div class="card">
+        <div class="hsort" role="group">
+          <b data-i18n="hotSortBy">排序</b>
+          <button type="button" class="btn small on" id="hotSortScoreBtn" data-hotsort="score" data-i18n="hotSortScore">熱度分數</button>
+          <button type="button" class="btn small ghost" id="hotSortReviewsBtn" data-hotsort="reviews" data-i18n="hotSortReviews">評論數</button>
+          <button type="button" class="btn small ghost" id="hotSortProductsBtn" data-hotsort="products" data-i18n="hotSortProducts">在售產品數</button>
+          <span id="hotFilterWrap" class="hotfilter hidden"><span class="muted" data-i18n="hotFilterBy">成分篩選：</span><b id="hotFilterName"></b><button type="button" class="btn ghost small" id="hotFilterClearBtn" data-i18n="hotClearFilter">✕ 清除篩選</button></span>
+        </div>
+      </div>
+      <div class="card" style="padding-top:4px">
+        <div id="hotMeta" class="muted" style="padding:10px 8px 0"></div>
+        <div class="hrow head"><span data-i18n="hotColRank">排名</span><span data-i18n="colBrand">品牌</span><span data-i18n="hotColScore">熱度分</span><span data-i18n="hotColReviews">評論數</span><span data-i18n="hotColProducts">在售產品數</span><span data-i18n="hotColIngredients">主要成分 Top 3</span><span data-i18n="hotColKeywords">熱門關鍵詞</span><span data-i18n="hotColTrend">趨勢</span><span data-i18n="colStatus">狀態</span><span data-i18n="colActions">操作</span></div>
+        <div id="hotList"></div>
+        <div id="hotEmpty" class="empty hidden" data-i18n="hotEmpty">尚無熱度快照（請先執行 sql-72 種子）。</div>
+      </div>
+      <p id="hotMsg" class="err"></p>
     </div>
   </section>
   <p id="msg" class="err"></p>
@@ -558,6 +604,21 @@ const I18N = {
     fxEmpty:"沒有符合的產品。", fxShowing:"共 {n} 個產品，顯示 {m} 個", fxLoadFail:"配方總覽載入失敗：",
     fxDashTitle:"配方完整度", fxDashBrands:"有產品的品牌", fxDashProducts:"產品總數", fxDashRate:"含量揭露率",
     fxDashBlend:"專有混合產品", fxDashNoLabel:"無標籤鏡像產品", fxDashViewNotReady:"配方視圖尚未建立（請先執行 sql-60）。",
+    /* 市場熱度（部署 #23；設計 v1.0） */
+    tabHotness:"市場熱度",
+    hotDashTitle:"本週最熱 Top 5", hotDashGo:"前往市場熱度",
+    hotDashNotReady:"熱度表尚未建立（請先執行 sql-72）。", hotDashEmpty:"尚無熱度快照。",
+    hotSortBy:"排序", hotSortScore:"熱度分數", hotSortReviews:"評論數", hotSortProducts:"在售產品數",
+    hotColRank:"排名", hotColScore:"熱度分", hotColReviews:"評論數", hotColProducts:"在售產品數",
+    hotColIngredients:"主要成分 Top 3", hotColKeywords:"熱門關鍵詞", hotColTrend:"趨勢",
+    hotPending:"待補",
+    hotTrendNew:"新上榜", hotTrendUp:"上升", hotTrendDown:"下降", hotTrendFlat:"持平",
+    hotEmpty:"尚無熱度快照（請先執行 sql-72 種子）。", hotEmptyFilter:"沒有含此成分的品牌。",
+    hotShowing:"{n} 個品牌，顯示 {m} 個（快照 {d}）",
+    hotLoadFail:"熱度表載入失敗：",
+    hotFilterBy:"成分篩選：", hotClearFilter:"✕ 清除篩選",
+    hotNoLead:"此品牌尚未進名單池，無法執行此操作。",
+    hotStatBrands:"上榜品牌", hotStatDate:"快照日期",
     googleSearch:"Google 搜尋",
     domainOverwriteConfirm:"網域已有值「{old}」，確定覆寫為「{new}」？"
   },
@@ -685,6 +746,21 @@ const I18N = {
     fxEmpty:"No matching products.", fxShowing:"{n} products in total, showing {m}", fxLoadFail:"Failed to load formula overview: ",
     fxDashTitle:"Formula completeness", fxDashBrands:"Brands with products", fxDashProducts:"Total products", fxDashRate:"Disclosure rate",
     fxDashBlend:"Proprietary-blend products", fxDashNoLabel:"Products without label image", fxDashViewNotReady:"Formula view not created yet (run sql-60 first).",
+    /* Market hotness (deployment #23; design v1.0) */
+    tabHotness:"Market Hotness",
+    hotDashTitle:"Hottest This Week — Top 5", hotDashGo:"Open market hotness",
+    hotDashNotReady:"Hotness table not created yet (run sql-72 first).", hotDashEmpty:"No hotness snapshot yet.",
+    hotSortBy:"Sort by", hotSortScore:"Hotness score", hotSortReviews:"Reviews", hotSortProducts:"On-market products",
+    hotColRank:"Rank", hotColScore:"Hotness", hotColReviews:"Reviews", hotColProducts:"On-market products",
+    hotColIngredients:"Top 3 ingredients", hotColKeywords:"Hot keywords", hotColTrend:"Trend",
+    hotPending:"Pending",
+    hotTrendNew:"New", hotTrendUp:"Up", hotTrendDown:"Down", hotTrendFlat:"Flat",
+    hotEmpty:"No hotness snapshot yet (run the sql-72 seed first).", hotEmptyFilter:"No brands contain this ingredient.",
+    hotShowing:"{n} brands, showing {m} (snapshot {d})",
+    hotLoadFail:"Failed to load hotness table: ",
+    hotFilterBy:"Ingredient filter:", hotClearFilter:"✕ Clear filter",
+    hotNoLead:"This brand is not in the leads pool yet, so this action is unavailable.",
+    hotStatBrands:"Ranked brands", hotStatDate:"Snapshot date",
     googleSearch:"Google search",
     domainOverwriteConfirm:"Domain already has “{old}”. Overwrite it with “{new}”?"
   }
@@ -815,13 +891,17 @@ const api = {
     const all = [];
     let offset = 0;
     for (;;) {
-      const page = await sb("/rest/v1/crm_leads?select=*&order=monthly_revenue.desc&limit=1000&offset=" + offset, { headers: headers() });
+      const page = await sb("/rest/v1/crm_leads?select=*&order=monthly_revenue.desc,id.asc&limit=1000&offset=" + offset, { headers: headers() });
       if (!Array.isArray(page) || page.length === 0) break;
       all.push(...page);
       if (page.length < 1000) break;
       offset += page.length;
     }
-    return all;
+    /* 部署 #22b 修正：order 原只有 monthly_revenue.desc、無並列鍵，5,178 筆 NULL 營收
+       並列使 Postgres 每頁回傳順序不定（實測 726 筆重複載入、726 筆漏載）；加 id.asc
+       作決定性並列鍵（顯示順序不變，營收降序＋NULL 在前、id 升序）。
+       防禦性去重：按 id 首次出現保留，萬一伺服器端再有重疊也不會污染 leads 陣列。 */
+    return [...new Map(all.map(r => [r.id, r])).values()];
   },
   addCompany: body => sb("/rest/v1/crm_companies", { method: "POST", headers: headers(true), body: JSON.stringify(body) }),
   addLeadsBulk: body => sb("/rest/v1/crm_leads", { method: "POST", headers: headers(true), body: JSON.stringify(body) }),
@@ -847,6 +927,8 @@ const api = {
   productsAll: () => sb("/rest/v1/crm_products?select=brand_id&limit=1000", { headers: headers() }),
   /* 配方總覽（formula v2.0 Phase 1）：讀 v_formula_completeness 視圖（sql-60） */
   formulaCompleteness: () => sb("/rest/v1/v_formula_completeness?select=*&order=product_name.asc&limit=1000", { headers: headers() }),
+  /* 市場熱度（部署 #23）：讀 crm_brand_hotness（sql-72）；表未建時 404，由呼叫端接住顯示待補狀態 */
+  hotness: () => sb("/rest/v1/crm_brand_hotness?select=*&order=snapshot_date.desc,score.desc&limit=200", { headers: headers() }),
   /* 成分篩選：對 ingredient_name 做 ilike，只回 product_id */
   ingredientsByName: name => sb("/rest/v1/crm_formula_ingredients?ingredient_name=ilike.*"+ encodeURIComponent(name) + "*&select=product_id&limit=1000", { headers: headers() }),
   reviewsAll: () => sb("/rest/v1/crm_reviews?select=brand_id&limit=1000", { headers: headers() }),
@@ -865,6 +947,7 @@ function applyLang() {
   if (currentLead) openLeadDetail(currentLead);
   if (mainViewTab === "dashboard") renderDashboard();
   if (mainViewTab === "formulas") renderFormulas();
+  if (mainViewTab === "hotness") renderHotness();
   syncStickyTop();
 }
 $("#langBtn").addEventListener("click", () => {
@@ -1359,17 +1442,22 @@ function showMainTab(which) {
   $("#companiesView").classList.toggle("hidden", which !== "companies");
   $("#leadsView").classList.toggle("hidden", which !== "leads");
   $("#formulasView").classList.toggle("hidden", which !== "formulas");
+  $("#hotnessView").classList.toggle("hidden", which !== "hotness");
   $("#viewDashboardBtn").classList.toggle("on", which === "dashboard");
   $("#viewCompaniesBtn").classList.toggle("on", which === "companies");
   $("#viewLeadsBtn").classList.toggle("on", which === "leads");
   $("#viewFormulasBtn").classList.toggle("on", which === "formulas");
+  $("#viewHotnessBtn").classList.toggle("on", which === "hotness");
   if (which === "leads" && !leadsLoaded) loadLeads();
   if (which === "dashboard") renderDashboard();
   if (which === "formulas") { if (!fxLoaded) loadFormulas(); else renderFormulas(); }
+  if (which === "hotness") { if (!hotLoaded) loadHotness(); else renderHotness(); }
 }
 $("#viewCompaniesBtn").addEventListener("click", () => showMainTab("companies"));
 $("#viewLeadsBtn").addEventListener("click", () => showMainTab("leads"));
 $("#viewFormulasBtn").addEventListener("click", () => showMainTab("formulas"));
+$("#viewHotnessBtn").addEventListener("click", () => showMainTab("hotness"));
+$("#dashGoHotness").addEventListener("click", () => showMainTab("hotness"));
 $("#viewDashboardBtn").addEventListener("click", () => showMainTab("dashboard"));
 $("#dashGoCompanies").addEventListener("click", () => showMainTab("companies"));
 $("#dashGoLeads").addEventListener("click", () => showMainTab("leads"));
@@ -1656,6 +1744,8 @@ async function renderDashboard() {
     fxLoaded = true;
     renderFxDash(fxRows, null);
   } catch (e) { renderFxDash(null, e); }
+  /* 市場熱度 Top 5 卡（部署 #23）：表未建時只顯示待補，不擋儀表板其餘內容 */
+  if (!hotLoaded && !hotLoadPromise) loadHotness(); else renderHotDash();
   const pending = logErr ? [] : (logRows || []).filter(r => r.status === "pending");
   const apRunning = apRows.filter(r => r.status === "requested" || r.status === "in_progress").length;
   const reqRunning = reqRows.filter(r => r.status === "requested" || r.status === "in_progress");
@@ -2315,6 +2405,205 @@ $("#fxResetBtn").addEventListener("click", () => {
   fxIngredientIds = null;
   renderFormulas();
 });
+
+/* ---------- 市場熱度（部署 #23；設計 v1.0） ----------
+   快照表 crm_brand_hotness（sql-72）未執行前查詢會 404：分頁與儀表板卡
+   都接住錯誤、顯示友善空狀態（「熱度表尚未建立，請先執行 sql-72」），
+   不擋其他內容、不拋 pageerror。缺訊號（評論數／熱門關鍵詞）顯示「待補」，
+   絕不填零。行操作沿用名單明細：研究／Apollo／晉升／編輯皆開名單明細
+   再走既有流程（研究與 Apollo 會在明細請求狀態載入後自動點明細內對應
+   按鈕）；品牌未進名單池時顯示提示、不亂建名單。 */
+let hotRows = [];
+let hotLoaded = false;
+let hotLoadPromise = null;
+let hotLoadErr = null;
+let hotSort = "score";
+let hotIngFilter = null;
+function hotScore(r) { return r.score == null || r.score === "" ? null : Number(r.score); }
+function hotTopIngredients(r) {
+  const v = r.top_ingredients;
+  if (!v) return [];
+  if (Array.isArray(v)) return v;
+  try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch (e) { return []; }
+}
+function hotByScore(a, b) {
+  return (hotScore(b) == null ? -1 : hotScore(b)) - (hotScore(a) == null ? -1 : hotScore(a))
+    || (b.on_market || 0) - (a.on_market || 0)
+    || String(a.brand || "").localeCompare(String(b.brand || ""));
+}
+function hotFiltered() {
+  const list = hotRows.filter(r => !hotIngFilter || hotTopIngredients(r).some(x => (x.ingredient || "") === hotIngFilter));
+  if (hotSort === "reviews") return [...list].sort((a, b) => {
+    const ar = a.reviews_count, br = b.reviews_count;
+    if (ar == null && br == null) return hotByScore(a, b);
+    if (ar == null) return 1;
+    if (br == null) return -1;
+    return br - ar || hotByScore(a, b);
+  });
+  if (hotSort === "products") return [...list].sort((a, b) => (b.on_market || 0) - (a.on_market || 0) || hotByScore(a, b));
+  return [...list].sort(hotByScore);
+}
+function hotRankOf(r) {
+  /* 競爭排名：同分＋同在售數者同名次（設計 §8 並列排名），下一名次跳號 */
+  const ordered = [...hotRows].sort(hotByScore);
+  let rank = 0, prev = null;
+  for (let i = 0; i < ordered.length; i++) {
+    const key = hotScore(ordered[i]) + "|" + (ordered[i].on_market || 0);
+    if (key !== prev) { rank = i + 1; prev = key; }
+    if (ordered[i] === r) return rank;
+  }
+  return rank;
+}
+function hotTrendHtml(r) {
+  if (r.trend === "new") return esc(t("hotTrendNew"));
+  if (r.trend === "up") return "↑ " + esc(t("hotTrendUp"));
+  if (r.trend === "down") return "↓ " + esc(t("hotTrendDown"));
+  if (r.trend === "flat") return "→ " + esc(t("hotTrendFlat"));
+  return esc(r.trend || "—");
+}
+function renderHotDash() {
+  const el = $("#hotDashList");
+  if (!el) return;
+  if (hotLoadErr) { el.innerHTML = `<span class="muted">${esc(t("hotDashNotReady"))}</span>`; return; }
+  if (!hotLoaded) { el.innerHTML = `<span class="muted">${esc(t("loading"))}</span>`; return; }
+  const top5 = hotRows.slice(0, 5);
+  if (!top5.length) { el.innerHTML = `<span class="muted">${esc(t("hotDashEmpty"))}</span>`; return; }
+  el.innerHTML = top5.map((r, i) =>
+    `<div class="subitem" data-hot="${esc(r.brand)}" style="cursor:pointer"><b>${i + 1}. ${esc(r.brand)}</b> · ${hotScore(r) == null ? esc(t("hotPending")) : hotScore(r).toFixed(1)} · ${esc(t("hotColProducts"))} ${r.on_market == null ? "—" : r.on_market}</div>`
+  ).join("");
+  el.querySelectorAll("[data-hot]").forEach(s => s.addEventListener("click", () => showMainTab("hotness")));
+}
+function renderHotness() {
+  const statsEl = $("#hotStats"), metaEl = $("#hotMeta"), box = $("#hotList"), emptyEl = $("#hotEmpty");
+  if (!statsEl || !box) return;
+  document.querySelectorAll("[data-hotsort]").forEach(b => {
+    const on = b.dataset.hotsort === hotSort;
+    b.classList.toggle("on", on);
+    b.classList.toggle("ghost", !on);
+  });
+  const fw = $("#hotFilterWrap");
+  if (fw) fw.classList.toggle("hidden", !hotIngFilter);
+  if (hotIngFilter) $("#hotFilterName").textContent = hotIngFilter;
+  if (hotLoadErr) {
+    statsEl.innerHTML = "";
+    metaEl.textContent = "";
+    box.innerHTML = "";
+    emptyEl.classList.remove("hidden");
+    emptyEl.textContent = t("hotDashNotReady");
+    return;
+  }
+  const list = hotFiltered();
+  const snap = hotRows.length ? (hotRows[0].snapshot_date || "") : "";
+  statsEl.innerHTML = hotRows.length
+    ? `<div class="stat"><b>${hotRows.length}</b><span>${esc(t("hotStatBrands"))}</span></div><div class="stat"><b>${esc(snap || "—")}</b><span>${esc(t("hotStatDate"))}</span></div>`
+    : "";
+  metaEl.textContent = hotRows.length ? t("hotShowing").replace("{n}", hotRows.length).replace("{m}", list.length).replace("{d}", snap || "—") : "";
+  box.innerHTML = "";
+  emptyEl.classList.toggle("hidden", list.length > 0);
+  if (!list.length) emptyEl.textContent = hotIngFilter ? t("hotEmptyFilter") : t("hotEmpty");
+  list.forEach(r => {
+    const d = document.createElement("div");
+    d.className = "hrow";
+    const ings = hotTopIngredients(r);
+    const ingHtml = ings.length
+      ? ings.map(x => `<button type="button" class="ingchip${hotIngFilter === x.ingredient ? " on" : ""}" data-ing="${esc(x.ingredient)}">${esc(x.ingredient)} (${x.labels})</button>`).join("")
+      : `<span class="muted">${esc(t("hotPending"))}</span>`;
+    const sc = hotScore(r);
+    d.innerHTML =
+      `<span class="num" data-l="${esc(t("hotColRank"))}">${hotRankOf(r)}</span>` +
+      `<span><span class="nm" data-hotbrand>${esc(r.brand || t("untitled"))}</span></span>` +
+      `<span class="score" data-l="${esc(t("hotColScore"))}">${sc == null ? esc(t("hotPending")) : sc.toFixed(1)}</span>` +
+      `<span class="num" data-l="${esc(t("hotColReviews"))}">${r.reviews_count == null || r.reviews_count === "" ? esc(t("hotPending")) : esc(fmtInt(r.reviews_count))}</span>` +
+      `<span class="num" data-l="${esc(t("hotColProducts"))}">${r.on_market == null ? "—" : r.on_market}</span>` +
+      `<span data-l="${esc(t("hotColIngredients"))}">${ingHtml}</span>` +
+      `<span data-l="${esc(t("hotColKeywords"))}">${r.hot_keywords ? esc(r.hot_keywords) : esc(t("hotPending"))}</span>` +
+      `<span data-l="${esc(t("hotColTrend"))}">${hotTrendHtml(r)}</span>` +
+      `<span data-l="${esc(t("colStatus"))}">${r.status ? `<span class="tag ${leadStatusTag(r.status)}">${esc(leadStatusLabel(r.status))}</span>` : "—"}</span>` +
+      `<span class="acts">` +
+        `<button type="button" class="btn small" data-hotact="research">${esc(t("leadResearch"))}</button>` +
+        `<button type="button" class="btn ghost small" data-hotact="apollo">${esc(t("leadApollo"))}</button>` +
+        `<button type="button" class="btn ghost small" data-hotact="promote">${esc(t("leadPromote"))}</button>` +
+        `<button type="button" class="btn ghost small" data-hotact="edit">${esc(t("leadEdit"))}</button>` +
+      `</span>`;
+    d.querySelectorAll("[data-ing]").forEach(ch => ch.addEventListener("click", e => {
+      e.stopPropagation();
+      hotIngFilter = hotIngFilter === ch.dataset.ing ? null : ch.dataset.ing;
+      renderHotness();
+    }));
+    d.querySelector("[data-hotbrand]").addEventListener("click", () => hotnessAction(r, "open"));
+    d.querySelectorAll("[data-hotact]").forEach(b => b.addEventListener("click", e => {
+      e.stopPropagation();
+      hotnessAction(r, b.dataset.hotact);
+    }));
+    box.appendChild(d);
+  });
+}
+async function loadHotness() {
+  if (hotLoadPromise) return hotLoadPromise;
+  const self = (async () => {
+    try {
+      const rows = await api.hotness();
+      const arr = Array.isArray(rows) ? rows : [];
+      /* 只留最新一版快照（按 snapshot_date 降序取首筆日期）；舊版保留在表內作趨勢對比 */
+      const latest = arr.length ? arr[0].snapshot_date : null;
+      hotRows = latest ? arr.filter(r => r.snapshot_date === latest) : [];
+      hotRows.sort(hotByScore);
+      hotLoaded = true;
+      hotLoadErr = null;
+      renderHotness();
+      renderHotDash();
+    } catch (e) {
+      hotRows = [];
+      hotLoaded = false;
+      hotLoadErr = e;
+      renderHotness();
+      renderHotDash();
+    } finally {
+      if (hotLoadPromise === self) hotLoadPromise = null;
+    }
+  })();
+  hotLoadPromise = self;
+  return self;
+}
+async function hotnessLead(r) {
+  if (!leadsLoaded) await loadLeads();
+  return leads.find(l => l.id === r.lead_id)
+    || leads.find(l => normBrand(l.brand) === normBrand(r.brand))
+    || null;
+}
+async function hotnessAction(r, action) {
+  const msgEl = $("#hotMsg");
+  if (msgEl) { msgEl.textContent = ""; msgEl.className = "err"; }
+  let lead = null;
+  try {
+    lead = await hotnessLead(r);
+  } catch (e) {
+    if (msgEl) msgEl.textContent = t("hotLoadFail") + e.message;
+    return;
+  }
+  if (!lead) {
+    if (msgEl) msgEl.textContent = t("hotNoLead");
+    return;
+  }
+  if (action === "promote") { promoteLead(lead); return; }
+  openLeadDetail(lead);
+  if (action === "edit") { enterLeadEdit(); return; }
+  if (action === "open") return;
+  /* 研究／Apollo：等明細內請求狀態載入（按鈕解除鎖定）後自動點對應按鈕 */
+  const btnId = action === "research" ? "#ldResearchBtn" : "#ldApolloBtn";
+  const t0 = Date.now();
+  const tick = () => {
+    const btn = $(btnId);
+    if (btn && !btn.disabled) { btn.click(); return; }
+    if (Date.now() - t0 < 3000) setTimeout(tick, 150);
+  };
+  setTimeout(tick, 150);
+}
+document.querySelectorAll("[data-hotsort]").forEach(b => b.addEventListener("click", () => {
+  hotSort = b.dataset.hotsort;
+  renderHotness();
+}));
+$("#hotFilterClearBtn").addEventListener("click", () => { hotIngFilter = null; renderHotness(); });
 
 /* ---------- 產品與配方（crm_products／crm_formula_ingredients／crm_product_labels） ---------- */
 let labelObjectUrls = [];
