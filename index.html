@@ -719,6 +719,7 @@ let currentLead = null;   // 目前明細名單
 let tab = "info";
 let leads = [];
 let leadsLoaded = false;
+let leadsLoadPromise = null;   // 進行中的名單載入（部署 #21 in-flight guard：並行觸發共用同一 promise）
 let mainViewTab = "companies";
 let leadBusy = null;   // 正在執行晉升／拒絕的 lead id
 
@@ -840,7 +841,7 @@ function signOut(silent) {
   session = null;
   localStorage.removeItem("crm_session");
   companies = []; current = null;
-  leads = []; leadsLoaded = false; leadBusy = null;
+  leads = []; leadsLoaded = false; leadsLoadPromise = null; leadBusy = null;
   showMainTab("companies");
   closeDetail();
   showLogin();
@@ -2710,17 +2711,31 @@ function setLeadsMsg(text, kind) {
   el.className = kind === "ok" ? "ok" : kind === "muted" ? "muted" : "err";
 }
 async function loadLeads() {
-  setLeadsMsg(t("loading"), "muted");
-  try {
-    leads = await api.leads();
-    leadsLoaded = true;
-    leadPage = 1;
-    setLeadsMsg("", "muted");
-    renderLeadsStats(); renderLeads();
-    if (mainViewTab === "dashboard") renderDashboard();
-  } catch (e) {
-    setLeadsMsg(t("loadFail") + e.message, "err");
-  }
+  /* 部署 #21 in-flight guard：開頁時 showMainTab 與 renderDashboard 會並行觸發兩次
+     （皆不 await，leadsLoaded 要到 await 完成才變 true），改為共用同一個進行中 promise，
+     只發一組分頁請求。失敗時清除 guard，之後可重試；登出（signOut）會把 guard 設 null，
+     遲到的結果會被下面的 identity 檢查丟棄，不寫回舊資料。 */
+  if (leadsLoadPromise) return leadsLoadPromise;
+  const self = (async () => {
+    setLeadsMsg(t("loading"), "muted");
+    try {
+      const rows = await api.leads();
+      if (leadsLoadPromise !== self) return;   // 已被登出／重置，丟棄遲到結果
+      leads = rows;
+      leadsLoaded = true;
+      leadPage = 1;
+      setLeadsMsg("", "muted");
+      renderLeadsStats(); renderLeads();
+      if (mainViewTab === "dashboard") renderDashboard();
+    } catch (e) {
+      if (leadsLoadPromise !== self) return;   // 已被登出／重置，不顯示錯誤
+      setLeadsMsg(t("loadFail") + e.message, "err");
+    } finally {
+      if (leadsLoadPromise === self) leadsLoadPromise = null;
+    }
+  })();
+  leadsLoadPromise = self;
+  return self;
 }
 async function promoteLead(lead) {
   /* crm_companies.domain 為 NOT NULL UNIQUE：沒有網域的名單無法晉升，擋下並明說，不亂填佔位值 */
