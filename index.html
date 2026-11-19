@@ -92,6 +92,12 @@ a{color:var(--accent)}
 /* 配方總覽（formula v2.0 Phase 1）：表格橫捲，手機寬度不撐破版面 */
 .fxwrap{overflow-x:auto}
 .fxwrap .fx{min-width:780px}
+/* 研究紀錄列表優化（部署 #26；設計 v1.0）：全頁七欄表格橫捲，手機寬度不撐破版面 */
+.logwrap{overflow-x:auto}
+.logwrap .log{width:100%;min-width:860px;border-collapse:collapse;font-size:13px;margin:6px 0}
+.logwrap .log th,.logwrap .log td{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left;vertical-align:top}
+.logwrap .log th{color:var(--muted);font-size:12px}
+.log-expand-btn{margin-left:6px;white-space:nowrap}
 /* 主畫面分頁（品牌主檔／名單池） */
 /* 補齊缺口（backfill Phase 1）：維度卡可點選（最多 2 個維度），缺口清單勾選建批 */
 .bfgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
@@ -267,6 +273,7 @@ a{color:var(--accent)}
       <button id="viewFormulasBtn" type="button" data-i18n="tabFormulas">配方管理</button>
       <button id="viewHotnessBtn" type="button" data-i18n="tabHotness">市場熱度</button>
       <button id="viewDsldBtn" type="button" data-i18n="tabDsld">DSLD 分析</button>
+      <button id="viewLogBtn" type="button" data-i18n="logTitle">研究紀錄</button>
     </div>
     <div id="dashboardView">
       <div class="card"><div id="dashStats" class="stats"></div></div>
@@ -295,7 +302,7 @@ a{color:var(--accent)}
       <div class="card"><h3 data-i18n="fxDashTitle">配方完整度</h3><div id="fxDashStats" class="stats"></div><div id="fxDashDist" style="margin-top:8px"></div></div>
       <div class="card"><h3 data-i18n="hotDashTitle">本週最熱 Top 5</h3><div id="hotDashList"><span class="muted" data-i18n="loading">載入中…</span></div><div style="margin-top:10px"><button id="dashGoHotness" class="btn ghost" type="button" data-i18n="hotDashGo">前往市場熱度</button></div></div>
       <div class="card"><h3 data-i18n="dashFunnel">開發漏斗</h3><div id="dashFunnel"></div></div>
-      <div class="card"><h3 data-i18n="dashRecent">最新研究紀錄</h3><div id="dashRecent"></div></div>
+      <div class="card"><h3 data-i18n="dashRecent">最新研究紀錄</h3><div id="dashRecent"></div><div style="margin-top:10px"><button id="dashLogMoreBtn" class="btn ghost hidden" type="button"></button></div></div>
       <div class="card"><div style="display:flex;gap:8px;flex-wrap:wrap">
         <button id="dashGoCompanies" class="btn" type="button" data-i18n="dashGoCompanies">前往品牌主檔</button>
         <button id="dashGoLeads" class="btn ghost" type="button" data-i18n="dashGoLeads">前往名單池</button>
@@ -551,6 +558,31 @@ a{color:var(--accent)}
         <p class="muted" data-i18n="dsldNoCompareNote">市場級統計，不做品牌間配方對比。</p>
       </div>
     </div>
+    <!-- 研究紀錄全頁（部署 #26；設計 v1.0）：20 筆／頁＋狀態／品牌／欄位篩選 -->
+    <div id="logView" class="hidden">
+      <div class="card">
+        <div class="lfilters">
+          <div class="full-m"><label data-i18n="logFilterBrand">品牌搜尋</label><input id="logBrandQ" type="search" data-i18n-ph="logFilterBrandPh" placeholder="品牌名稱或 id…"></div>
+          <div><label data-i18n="leadStatus">狀態</label><select id="logStatus"><option value="" data-i18n="all">全部</option></select></div>
+          <div><label data-i18n="logFilterField">欄位</label><select id="logField"><option value="" data-i18n="all">全部</option></select></div>
+          <div><button id="logResetBtn" class="btn ghost" type="button" data-i18n="reset">重設</button></div>
+        </div>
+      </div>
+      <div class="card" style="padding-top:4px">
+        <div id="logMeta" class="muted" style="padding:10px 8px 0"></div>
+        <div class="logwrap"><table class="log" id="logTable">
+          <thead><tr>
+            <th data-i18n="colBrand">品牌</th><th data-i18n="logColField">欄位</th><th data-i18n="logColValue">值</th>
+            <th data-i18n="logColConfidence">信心度</th><th data-i18n="logColEvidence">證據</th>
+            <th data-i18n="logColObserved">觀察日</th><th data-i18n="logColStatus">狀態</th>
+          </tr></thead>
+          <tbody id="logList"></tbody>
+        </table></div>
+        <div id="logEmpty" class="empty hidden" data-i18n="logEmptyFilter">沒有符合的研究紀錄。</div>
+        <div id="logPager" class="pager"></div>
+      </div>
+      <p id="logMsg" class="err"></p>
+    </div>
   </section>
   <p id="msg" class="err"></p>
 </main>
@@ -704,9 +736,15 @@ const I18N = {
     dashResearchRunning:"研究進行中", dashLogNotReady:"研究紀錄表尚未建立（請先執行 sql-17）。",
     dashLoadFail:"儀表板載入失敗：", dashLeadsLoading:"名單載入中…", dashDataStatus:"資料狀態",
     logTitle:"研究紀錄", logEmpty:"尚無研究紀錄。", logLoadFail:"研究紀錄載入失敗：",
-    logConf:"信心度", logObserved:"觀察日", logSource:"來源", logEvidence:"證據",
+    logConf:"信心度", logObserved:"觀察日", logSource:"來源", logEvidence:"證據", /* 行內證據連結已改顯網域，不再使用；保留避免斷裂 */
     logApolloProfile:"Apollo 公司頁", logPending:"待審核", logApproved:"已核准",
     logHeld:"暫扣", logRejected:"退回", logSuperseded:"已取代",
+    /* 研究紀錄列表優化（部署 #26；設計 v1.0） */
+    logShowMore:"顯示更多", logViewAll:"查看全部", logExpand:"展開", logCollapse:"收起",
+    logFilterBrand:"品牌搜尋", logFilterBrandPh:"品牌名稱或 id…", logFilterField:"欄位",
+    logEmptyFilter:"沒有符合的研究紀錄。", logShowing:"共 {n} 筆，顯示第 {a}–{b} 筆",
+    logColField:"欄位", logColValue:"值", logColConfidence:"信心度", logColEvidence:"證據",
+    logColObserved:"觀察日", logColStatus:"狀態",
     formulaTitle:"產品與配方", formulaEmpty:"尚無產品與配方資料。", formulaLoadFail:"產品與配方載入失敗：",
     formulaServing:"每份", formulaServings:"份數", formulaFlavors:"口味", formulaClaims:"宣稱", formulaCalories:"熱量",
     formulaNutrition:"營養成分表", formulaIngredients:"成分表",
@@ -895,9 +933,15 @@ const I18N = {
     dashResearchRunning:"Research running", dashLogNotReady:"Research log table not created yet (run sql-17 first).",
     dashLoadFail:"Dashboard load failed: ", dashLeadsLoading:"Loading leads…", dashDataStatus:"Data status",
     logTitle:"Research log", logEmpty:"No research records yet.", logLoadFail:"Failed to load research log: ",
-    logConf:"Confidence", logObserved:"Observed", logSource:"Source", logEvidence:"Evidence",
+    logConf:"Confidence", logObserved:"Observed", logSource:"Source", logEvidence:"Evidence", /* inline evidence link now shows domain; kept to avoid breakage */
     logApolloProfile:"Apollo company page", logPending:"Pending", logApproved:"Approved",
     logHeld:"Held", logRejected:"Rejected", logSuperseded:"Superseded",
+    /* Research log list optimization (deploy #26; design v1.0) */
+    logShowMore:"Show more", logViewAll:"View all", logExpand:"Expand", logCollapse:"Collapse",
+    logFilterBrand:"Brand search", logFilterBrandPh:"Brand name or ID…", logFilterField:"Field",
+    logEmptyFilter:"No matching research records.", logShowing:"{n} records in total, showing {a}–{b}",
+    logColField:"Field", logColValue:"Value", logColConfidence:"Confidence", logColEvidence:"Evidence",
+    logColObserved:"Observed", logColStatus:"Status",
     formulaTitle:"Products & Formulas", formulaEmpty:"No products or formula data yet.", formulaLoadFail:"Failed to load products & formulas: ",
     formulaServing:"Serving", formulaServings:"Servings", formulaFlavors:"Flavors", formulaClaims:"Claims", formulaCalories:"Calories",
     formulaNutrition:"Nutrition Facts", formulaIngredients:"Ingredients",
@@ -1089,6 +1133,16 @@ let leadsLoaded = false;
 let leadsLoadPromise = null;   // 進行中的名單載入（部署 #21 in-flight guard：並行觸發共用同一 promise）
 let mainViewTab = "companies";
 let leadBusy = null;   // 正在執行晉升／拒絕的 lead id
+/* 研究紀錄列表優化（部署 #26；設計 v1.0）：狀態集中宣告於此，避免 applyLang／renderDashboard 在檔案後段宣告求值前觸及 */
+let dashLogShown = 5;      // 儀表板目前顯示筆數
+let dashLogRows = [];      // researchLogRecent 回傳的前 20 筆
+let dashLogHasMore = false; // 第 21 筆（sentinel）是否存在
+const logExpanded = new Set(); // 已展開長值的 r.id；語言切換時重置（applyLang）
+const LOG_PAGE_SIZE = 20;
+let logPage = 1, logTotal = 0, logRowsPage = [];
+let logStatus = "", logField = "", logBrandQ = "";
+let logLoaded = false, logLoadPromise = null;
+const detailLogShown = new Map(); // 明細研究紀錄目前顯示筆數，key 為容器 el.id
 
 const $ = s => document.querySelector(s);
 const t = k => (I18N[lang] && I18N[lang][k]) || I18N.zh[k] || k;
@@ -1169,9 +1223,22 @@ const api = {
   addResearchRequest: body => sb("/rest/v1/crm_research_requests", { method: "POST", headers: headers(true), body: JSON.stringify(body) }),
   apolloRequests: leadId => sb("/rest/v1/crm_apollo_requests?lead_id=eq." + encodeURIComponent(leadId) + "&select=*&order=requested_at.desc&limit=5", { headers: headers() }),
   addApolloRequest: body => sb("/rest/v1/crm_apollo_requests", { method: "POST", headers: headers(true), body: JSON.stringify(body) }),
-  /* 研究紀錄（crm_research_log）：明細＋儀表板共用 */
+  /* 研究紀錄（crm_research_log）：明細＋儀表板共用。
+     部署 #26 拆分（設計 §2.1）：researchLogAll（limit=1000）同時餵待辦佇列／待審核統計卡／最新列表，
+     直接改 limit 會靜默截斷 pending 統計，故拆成 researchLogRecent（limit=21 sentinel）＋
+     researchLogPending（pending 全取）；researchLogAll 已刪除。 */
   researchLog: brandId => sb("/rest/v1/crm_research_log?brand_id=eq." + encodeURIComponent(brandId) + "&select=*&order=observed_at.desc,created_at.desc&limit=200", { headers: headers() }),
-  researchLogAll: () => sb("/rest/v1/crm_research_log?select=*&order=created_at.desc&limit=1000", { headers: headers() }),
+  researchLogRecent: () => sb("/rest/v1/crm_research_log?select=*&order=created_at.desc&limit=21", { headers: headers() }),
+  researchLogPending: () => sb("/rest/v1/crm_research_log?status=eq.pending&select=*&order=created_at.desc&limit=1000", { headers: headers() }),
+  /* 研究紀錄全頁：limit=20＋offset＋篩選參數＋Prefer: count=exact，總數由 sbPage 讀 Content-Range */
+  researchLogPage: q => {
+    let path = "/rest/v1/crm_research_log?select=*&order=created_at.desc&limit=20&offset=" + ((q.page - 1) * 20);
+    if (q.status) path += "&status=eq." + encodeURIComponent(q.status);
+    if (q.field) path += "&field=eq." + encodeURIComponent(q.field);
+    if (q.brandIds && q.brandIds.length) path += "&brand_id=in.(" + q.brandIds.map(encodeURIComponent).join(",") + ")";
+    else if (q.brandQ) path += "&brand_id=ilike.*" + encodeURIComponent(q.brandQ) + "*";
+    return sbPage(path, { headers: { ...headers(), Prefer: "count=exact" } });
+  },
   researchRequestsAll: () => sb("/rest/v1/crm_research_requests?select=*&order=requested_at.desc&limit=100", { headers: headers() }),
   apolloRequestsAll: () => sb("/rest/v1/crm_apollo_requests?select=*&order=requested_at.desc&limit=100", { headers: headers() }),
   /* 產品與配方（crm_products／crm_formula_ingredients／crm_product_labels） */
@@ -1214,6 +1281,7 @@ function applyLang() {
   document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
   document.querySelectorAll("[data-i18n-ph]").forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
   $("#langBtn").textContent = lang === "en" ? "中文" : "EN";
+  logExpanded.clear(); /* 研究紀錄列表優化：語言切換重 render，展開狀態重置（設計 §6 B17） */
   renderStats(); renderList(); renderFilterOptions();
   renderLeadsStats(); renderLeads();
   if (current) renderDetail(current, true);
@@ -1222,6 +1290,7 @@ function applyLang() {
   if (mainViewTab === "formulas") { renderFormulas(); if (fxSubTab === "ingredients") { renderIngredients(); const ipm = $("#ingProposalMsg"); if (ipm) ipm.textContent = ""; } }
   if (mainViewTab === "hotness") renderHotness();
   if (mainViewTab === "dsld") renderDsld();
+  if (mainViewTab === "log") { renderLogFilterOptions(); renderLogPage(); }
   syncStickyTop();
 }
 $("#langBtn").addEventListener("click", () => {
@@ -1718,23 +1787,27 @@ function showMainTab(which) {
   $("#formulasView").classList.toggle("hidden", which !== "formulas");
   $("#hotnessView").classList.toggle("hidden", which !== "hotness");
   $("#dsldView").classList.toggle("hidden", which !== "dsld");
+  $("#logView").classList.toggle("hidden", which !== "log");
   $("#viewDashboardBtn").classList.toggle("on", which === "dashboard");
   $("#viewCompaniesBtn").classList.toggle("on", which === "companies");
   $("#viewLeadsBtn").classList.toggle("on", which === "leads");
   $("#viewFormulasBtn").classList.toggle("on", which === "formulas");
   $("#viewHotnessBtn").classList.toggle("on", which === "hotness");
   $("#viewDsldBtn").classList.toggle("on", which === "dsld");
+  $("#viewLogBtn").classList.toggle("on", which === "log");
   if (which === "leads" && !leadsLoaded) loadLeads();
   if (which === "dashboard") renderDashboard();
   if (which === "formulas") { if (!fxLoaded) loadFormulas(); else renderFormulas(); if (fxSubTab === "ingredients") { if (!ingLoaded) loadIngredients(); else renderIngredients(); } }
   if (which === "hotness") { if (!hotLoaded) loadHotness(); else renderHotness(); }
   if (which === "dsld") { if (!dsldLoaded) loadDsld(); else renderDsld(); }
+  if (which === "log") { if (!logLoaded) loadLogPage(); else renderLogPage(); }
 }
 $("#viewCompaniesBtn").addEventListener("click", () => showMainTab("companies"));
 $("#viewLeadsBtn").addEventListener("click", () => showMainTab("leads"));
 $("#viewFormulasBtn").addEventListener("click", () => showMainTab("formulas"));
 $("#viewHotnessBtn").addEventListener("click", () => showMainTab("hotness"));
 $("#viewDsldBtn").addEventListener("click", () => showMainTab("dsld"));
+$("#viewLogBtn").addEventListener("click", () => showMainTab("log"));
 $("#dashGoHotness").addEventListener("click", () => showMainTab("hotness"));
 $("#viewDashboardBtn").addEventListener("click", () => showMainTab("dashboard"));
 $("#dashGoCompanies").addEventListener("click", () => showMainTab("companies"));
@@ -1996,11 +2069,14 @@ async function renderDashboard() {
   funnelEl.innerHTML = leadTotal == null
     ? `<div class="muted">${esc(t("dashLeadsLoading"))}</div>` + steps.slice(3).map(s => funnelRow(s[0], s[1], max)).join("")
     : steps.map(s => funnelRow(s[0], s[1], max)).join("");
-  /* 待辦佇列＋最新研究紀錄：抓 log 與請求表 */
+  /* 待辦佇列＋最新研究紀錄：抓 log 與請求表。
+     部署 #26 拆分：最新列表只取 21 筆（sentinel 法），待辦佇列／待審核統計卡另取 pending 全量，
+     不可共用 21 筆，否則 pending 超過 20 筆即靜默少算。 */
   queueEl.innerHTML = `<span class="muted">${esc(t("loading"))}</span>`;
   recentEl.innerHTML = `<span class="muted">${esc(t("loading"))}</span>`;
-  let logRows = null, logErr = null;
-  try { logRows = await api.researchLogAll(); } catch (e) { logErr = e; }
+  let logRows = null, pendingRows = null, logErr = null;
+  try { logRows = await api.researchLogRecent(); } catch (e) { logErr = e; }
+  try { pendingRows = await api.researchLogPending(); } catch (e) { if (!logErr) logErr = e; pendingRows = []; }
   let reqRows = [], apRows = [];
   try { reqRows = await api.researchRequestsAll(); } catch (e) { reqRows = []; }
   try { apRows = await api.apolloRequestsAll(); } catch (e) { apRows = []; }
@@ -2024,7 +2100,7 @@ async function renderDashboard() {
   } catch (e) { renderFxDash(null, e); }
   /* 市場熱度 Top 5 卡（部署 #23）：表未建時只顯示待補，不擋儀表板其餘內容 */
   if (!hotLoaded && !hotLoadPromise) loadHotness(); else renderHotDash();
-  const pending = logErr ? [] : (logRows || []).filter(r => r.status === "pending");
+  const pending = logErr ? [] : (pendingRows || []).filter(r => r.status === "pending");
   const apRunning = apRows.filter(r => r.status === "requested" || r.status === "in_progress").length;
   const reqRunning = reqRows.filter(r => r.status === "requested" || r.status === "in_progress");
   const elP = $("#dashStatPending"), elA = $("#dashStatApollo");
@@ -2049,9 +2125,12 @@ async function renderDashboard() {
   }
   if (logErr) {
     recentEl.innerHTML = `<span class="err">${esc(t("dashLogNotReady"))}</span>`;
+    const mb = $("#dashLogMoreBtn"); if (mb) mb.classList.add("hidden");
   } else {
-    const recent = (logRows || []).slice(0, 10);
-    recentEl.innerHTML = recent.length ? recent.map(r => `<div class="subitem" data-brand="${esc(r.brand_id)}" style="cursor:pointer"><b>${esc(brandNameById(r.brand_id))}</b> · ${esc(logFieldLabel(r.field))} ${logStatusTag(r.status)}<br>${logValueHtml(r)}<br><span class="meta">${esc(r.observed_at || "")}${r.source_ref ? " · " + esc(r.source_ref) : ""}</span></div>`).join("") : `<div class="muted">${esc(t("logEmpty"))}</div>`;
+    dashLogRows = (logRows || []).slice(0, 20);
+    dashLogHasMore = (logRows || []).length > 20;
+    dashLogShown = 5;
+    renderDashRecent();
   }
   metaEl.textContent = `${t("dashDataStatus") || ""} ${companies.length} / ${leadTotal == null ? "…" : leadTotal} / ${logErr ? "—" : (logRows || []).length} · ${new Date().toLocaleString(lang === "en" ? "en-US" : "zh-TW")}`;
   if (bfPendingMsg) { const m = $("#bfMsg"); if (m) { m.textContent = bfPendingMsg; m.className = "ok"; } bfPendingMsg = null; }
@@ -2062,8 +2141,15 @@ $("#dashQueue").addEventListener("click", e => {
   if (it) openBrandById(it.dataset.brand);
 });
 $("#dashRecent").addEventListener("click", e => {
+  if (e.target.closest("[data-log-expand]")) return; /* 展開／收起按鈕：由文件層委派處理，不開明細 */
   const it = e.target.closest("[data-brand]");
   if (it) openBrandById(it.dataset.brand);
+});
+/* 儀表板最新研究紀錄「顯示更多／查看全部」按鈕（部署 #26；狀態機見 renderDashRecent） */
+$("#dashLogMoreBtn").addEventListener("click", () => {
+  if (dashLogShown === 20 && dashLogHasMore) { showMainTab("log"); return; }
+  dashLogShown = Math.min(dashLogShown + 5, 20);
+  renderDashRecent();
 });
 
 
@@ -2518,31 +2604,232 @@ function logFieldLabel(f) {
   if (f === "apollo_profile") return t("logApolloProfile");
   return fl(f);
 }
-function logValueHtml(r) {
+/* 證據連結只顯網域（部署 #26；設計 §2.4）：有效絕對 URL 顯示去 www. 的網域＋🔗，
+   無效／相對路徑純文字（不可點），多連結以空白／逗號／分號切分，空值顯示 —。 */
+function evidenceDomain(u) {
+  try { const h = new URL(String(u).trim()).hostname.replace(/^www\./, ""); return h ? { ok: true, domain: h } : { ok: false }; }
+  catch (e) { return { ok: false }; }
+}
+function evidenceLinksHtml(urlField) {
+  const parts = String(urlField || "").split(/[\s,;]+/).filter(Boolean);
+  if (!parts.length) return "—";
+  return parts.map(u => {
+    const d = evidenceDomain(u);
+    if (d.ok) return `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(d.domain)} 🔗</a>`;
+    return esc(u.length > 30 ? u.slice(0, 30) + "…" : u);
+  }).join(" · ");
+}
+/* 單列收斂（部署 #26；設計 §2.4）：值 >60 字（String.length，中英同算）截前 60 字＋…＋
+   按列展開／收起；URL 值收合態顯示網域＋…，href 仍為完整 URL；60 字整／空值無按鈕。 */
+function logValueHtml(r, ctx) {
   const v = r.value || "";
   if (!v) return "—";
+  const expanded = logExpanded.has(r.id);
+  const btn = `<button type="button" class="btn ghost small log-expand-btn" data-log-expand="${esc(r.id)}" data-log-ctx="${ctx || "detail"}">${esc(t(expanded ? "logCollapse" : "logExpand"))}</button>`;
   if (isUrl(v)) {
-    const short = v.length > 60 ? v.slice(0, 60) + "…" : v;
-    return `<a href="${esc(v)}" target="_blank" rel="noopener">${esc(short)}</a>`;
+    if (v.length <= 60) return `<a href="${esc(v)}" target="_blank" rel="noopener">${esc(v)}</a>`;
+    if (expanded) return `<a href="${esc(v)}" target="_blank" rel="noopener">${esc(v)}</a>` + btn;
+    const d = evidenceDomain(v);
+    const label = d.ok ? d.domain + "…" : v.slice(0, 60) + "…";
+    return `<a href="${esc(v)}" target="_blank" rel="noopener">${esc(label)}</a>` + btn;
   }
-  return esc(v);
+  if (v.length <= 60) return esc(v);
+  if (expanded) return esc(v) + btn;
+  return esc(v.slice(0, 60)) + "…" + btn;
+}
+/* 單列 subitem（儀表板／明細共用）：儀表板列可點開明細，明細列不可點；meta 格式兩處沿用現況，
+   儀表板 meta 行末補證據網域連結（協調員 2026-11-19 拍板，見規格書附錄 B 第 6 點）。 */
+function logSubitemHtml(r, ctx) {
+  const meta = ctx === "dash"
+    ? `${esc(r.observed_at || "")}${r.source_ref ? " · " + esc(r.source_ref) : ""}${r.evidence_url && r.field !== "apollo_profile" ? " · " + evidenceLinksHtml(r.evidence_url) : ""}`
+    : `${esc(t("logConf"))}: ${esc(r.confidence || "—")} · ${esc(t("logObserved"))}: ${esc(r.observed_at || "—")} · ${esc(t("logSource"))}: ${esc(r.source_type || "")}${r.source_ref ? " · " + esc(r.source_ref) : ""}${r.note ? " · " + esc(r.note) : ""}${r.evidence_url && r.field !== "apollo_profile" ? " · " + evidenceLinksHtml(r.evidence_url) : ""}`;
+  const head = ctx === "dash"
+    ? `<b>${esc(brandNameById(r.brand_id))}</b> · ${esc(logFieldLabel(r.field))} ${logStatusTag(r.status)}<br>`
+    : `<b>${esc(logFieldLabel(r.field))}</b> ${logStatusTag(r.status)}<br>`;
+  const attrs = ctx === "dash" ? ` data-brand="${esc(r.brand_id)}" style="cursor:pointer"` : "";
+  return `<div class="subitem"${attrs}>${head}${logValueHtml(r, ctx)}<br><span class="meta">${meta}</span></div>`;
 }
 function researchLogHtml(rows) {
   if (!rows.length) return `<div class="muted">${esc(t("logEmpty"))}</div>`;
-  return rows.map(r => `<div class="subitem"><b>${esc(logFieldLabel(r.field))}</b> ${logStatusTag(r.status)}<br>
-    ${logValueHtml(r)}<br>
-    <span class="meta">${esc(t("logConf"))}: ${esc(r.confidence || "—")} · ${esc(t("logObserved"))}: ${esc(r.observed_at || "—")} · ${esc(t("logSource"))}: ${esc(r.source_type || "")}${r.source_ref ? " · " + esc(r.source_ref) : ""}${r.note ? " · " + esc(r.note) : ""}${r.evidence_url && r.field !== "apollo_profile" ? ` · <a href="${esc(r.evidence_url)}" target="_blank" rel="noopener">${esc(t("logEvidence"))}</a>` : ""}</span></div>`).join("");
+  return rows.map(r => logSubitemHtml(r, "detail")).join("");
 }
+/* 儀表板最新研究紀錄（部署 #26；設計 §2.2）：預設 5 筆，「顯示更多」每次 +5，上限 20，
+   到 20 筆且有第 21 筆（sentinel）時按鈕變「查看全部」進全頁；總數 ≤5 筆時按鈕隱藏。 */
+function renderDashRecent() {
+  const recentEl = $("#dashRecent");
+  if (!recentEl) return;
+  const shown = dashLogRows.slice(0, dashLogShown);
+  recentEl.innerHTML = shown.length ? shown.map(r => logSubitemHtml(r, "dash")).join("") : `<div class="muted">${esc(t("logEmpty"))}</div>`;
+  const btn = $("#dashLogMoreBtn");
+  if (!btn) return;
+  if (dashLogRows.length <= 5) { btn.classList.add("hidden"); return; }
+  if (dashLogShown < 20 && dashLogShown < dashLogRows.length) {
+    btn.classList.remove("hidden");
+    btn.textContent = t("logShowMore");
+  } else if (dashLogShown === 20 && dashLogHasMore) {
+    btn.classList.remove("hidden");
+    btn.textContent = t("logViewAll");
+  } else {
+    btn.classList.add("hidden");
+  }
+}
+/* 明細研究紀錄區（部署 #26；設計 §2.5）：預設 5 筆，「顯示更多」每次 +5，顯示完即止（不設 20 上限）；
+   查詢不變（limit=200），前端分段顯示。 */
 async function loadResearchLog(brandId, el) {
   if (!el) return;
   el.innerHTML = `<span class="muted">${esc(t("loading"))}</span>`;
+  const oldBtn = el.parentNode ? el.parentNode.querySelector("[data-logmore]") : null;
+  if (oldBtn) oldBtn.remove();
   try {
     const rows = await api.researchLog(brandId);
-    el.innerHTML = researchLogHtml(Array.isArray(rows) ? rows : []);
+    el._logRows = Array.isArray(rows) ? rows : [];
+    detailLogShown.set(el.id, 5);
+    renderDetailLog(el);
   } catch (e) {
+    el._logRows = [];
     el.innerHTML = `<span class="err">${esc(t("logLoadFail"))}${esc(e.message)}</span>`;
   }
 }
+function renderDetailLog(el) {
+  const rows = el._logRows || [];
+  const shown = detailLogShown.get(el.id) || 5;
+  el.innerHTML = researchLogHtml(rows.slice(0, shown));
+  let btn = el.parentNode ? el.parentNode.querySelector("[data-logmore]") : null;
+  if (rows.length > shown) {
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn ghost small";
+      btn.setAttribute("data-logmore", "");
+      btn.addEventListener("click", () => {
+        detailLogShown.set(el.id, Math.min((detailLogShown.get(el.id) || 5) + 5, rows.length));
+        renderDetailLog(el);
+      });
+      el.after(btn);
+    }
+    btn.textContent = t("logShowMore");
+    btn.classList.remove("hidden");
+  } else if (btn) {
+    btn.remove();
+  }
+}
+
+/* ---------- 研究紀錄全頁（部署 #26；設計 §2.3） ----------
+   20 筆／頁＋狀態／品牌／欄位篩選；查詢走 PostgREST limit＋offset＋篩選參數＋Prefer: count=exact，
+   總數由 sbPage 讀 Content-Range；篩選變更一律回第 1 頁。 */
+function renderLogFilterOptions() {
+  const st = $("#logStatus"), fd = $("#logField");
+  if (!st || !fd) return;
+  const keepSt = logStatus, keepFd = logField;
+  const statusKey = { pending: "logPending", approved: "logApproved", held: "logHeld", rejected: "logRejected", superseded: "logSuperseded" };
+  st.innerHTML = `<option value="">${esc(t("all"))}</option>` + Object.keys(statusKey).map(s => `<option value="${s}">${esc(t(statusKey[s]))}</option>`).join("");
+  fd.innerHTML = `<option value="">${esc(t("all"))}</option>` + [...Object.keys(FIELD_LABEL).sort(), "apollo_profile"].map(f => `<option value="${esc(f)}">${esc(logFieldLabel(f))}</option>`).join("");
+  st.value = keepSt; fd.value = keepFd;
+}
+async function logBrandIdsForQuery(q) {
+  const query = (q || "").trim();
+  if (!query) return null;
+  if (!leadsLoaded) { try { await loadLeads(); } catch (e) {} }
+  const lower = query.toLowerCase();
+  const ids = [];
+  companies.forEach(c => { if ((c.name || "").toLowerCase().includes(lower)) ids.push(c.id); });
+  leads.forEach(l => { if ((l.brand || "").toLowerCase().includes(lower)) ids.push(l.id); });
+  if (ids.length) return { brandIds: [...new Set(ids)] };
+  return { brandQ: query };
+}
+async function loadLogPage() {
+  if (logLoadPromise) return logLoadPromise;
+  const self = (async () => {
+    renderLogFilterOptions();
+    const msgEl = $("#logMsg"); if (msgEl) msgEl.textContent = "";
+    const metaEl = $("#logMeta"); if (metaEl) metaEl.textContent = t("loading");
+    try {
+      const bq = await logBrandIdsForQuery(logBrandQ);
+      const { rows, total } = await api.researchLogPage({ status: logStatus, field: logField, brandIds: bq && bq.brandIds, brandQ: bq && bq.brandQ, page: logPage });
+      logRowsPage = rows || [];
+      logTotal = total || 0;
+      logLoaded = true;
+      renderLogPage();
+    } catch (e) {
+      logRowsPage = []; logTotal = 0;
+      if (msgEl) msgEl.textContent = t("logLoadFail") + e.message;
+      renderLogPage();
+    } finally {
+      if (logLoadPromise === self) logLoadPromise = null;
+    }
+  })();
+  logLoadPromise = self;
+  return self;
+}
+function logTableRowHtml(r) {
+  return `<tr data-brand="${esc(r.brand_id)}" style="cursor:pointer"><td>${esc(brandNameById(r.brand_id))}</td><td>${esc(logFieldLabel(r.field))}</td><td>${logValueHtml(r, "log")}</td><td>${esc(r.confidence || "—")}</td><td>${r.field === "apollo_profile" ? "—" : evidenceLinksHtml(r.evidence_url)}</td><td>${esc(r.observed_at || "—")}</td><td>${logStatusTag(r.status)}</td></tr>`;
+}
+function renderLogPage() {
+  const listEl = $("#logList"), metaEl = $("#logMeta"), emptyEl = $("#logEmpty"), pagerEl = $("#logPager"), tableEl = $("#logTable");
+  if (!listEl) return;
+  const total = logTotal;
+  const a = total === 0 ? 0 : (logPage - 1) * LOG_PAGE_SIZE + 1;
+  const b = Math.min(total, logPage * LOG_PAGE_SIZE);
+  if (metaEl) metaEl.textContent = t("logShowing").replace("{n}", total).replace("{a}", a).replace("{b}", b);
+  const hasFilter = logStatus || logField || (logBrandQ || "").trim();
+  if (!logRowsPage.length) {
+    listEl.innerHTML = "";
+    if (tableEl) tableEl.classList.add("hidden");
+    if (emptyEl) { emptyEl.classList.remove("hidden"); emptyEl.textContent = t(hasFilter ? "logEmptyFilter" : "logEmpty"); }
+  } else {
+    if (tableEl) tableEl.classList.remove("hidden");
+    if (emptyEl) emptyEl.classList.add("hidden");
+    listEl.innerHTML = logRowsPage.map(r => logTableRowHtml(r)).join("");
+  }
+  const totalPages = Math.max(1, Math.ceil(total / LOG_PAGE_SIZE));
+  if (pagerEl) renderPager(pagerEl, logPage, totalPages, total, (logPage - 1) * LOG_PAGE_SIZE, LOG_PAGE_SIZE, p => { logPage = p; loadLogPage(); });
+}
+/* 長值展開／收起（部署 #26；設計 §2.4）：文件層委派，三處（儀表板／全頁／明細）共用；
+   只重 render 該列（outerHTML 置換），不整表重 render；儀表板／全頁的列點擊監聽已先行攔截，
+   故此處不需 stopPropagation（容器監聽在冒泡順序上先於文件層）。 */
+document.addEventListener("click", e => {
+  const btn = e.target.closest("[data-log-expand]");
+  if (!btn) return;
+  const id = btn.dataset.logExpand;
+  if (logExpanded.has(id)) logExpanded.delete(id); else logExpanded.add(id);
+  const ctx = btn.dataset.logCtx || "detail";
+  if (ctx === "dash") {
+    const r = dashLogRows.find(x => x.id === id);
+    const el = btn.closest(".subitem");
+    if (r && el) el.outerHTML = logSubitemHtml(r, "dash");
+    return;
+  }
+  if (ctx === "log") {
+    const r = logRowsPage.find(x => x.id === id);
+    const el = btn.closest("tr");
+    if (r && el) el.outerHTML = logTableRowHtml(r);
+    return;
+  }
+  const wrap = btn.closest("#researchLog, #ldResearchLog");
+  const rows = wrap && wrap._logRows;
+  const r = rows && rows.find(x => x.id === id);
+  const el = btn.closest(".subitem");
+  if (r && el) el.outerHTML = logSubitemHtml(r, "detail");
+});
+/* 研究紀錄全頁篩選接線（部署 #26）：狀態／欄位 change、品牌搜尋 input（debounce 300ms），
+   篩選變更一律回第 1 頁；重設清空三個篩選並回第 1 頁。 */
+let logBrandTimer = null;
+$("#logStatus").addEventListener("change", () => { logStatus = $("#logStatus").value; logPage = 1; loadLogPage(); });
+$("#logField").addEventListener("change", () => { logField = $("#logField").value; logPage = 1; loadLogPage(); });
+$("#logBrandQ").addEventListener("input", () => {
+  clearTimeout(logBrandTimer);
+  logBrandTimer = setTimeout(() => { logBrandQ = $("#logBrandQ").value; logPage = 1; loadLogPage(); }, 300);
+});
+$("#logResetBtn").addEventListener("click", () => {
+  logStatus = ""; logField = ""; logBrandQ = "";
+  $("#logStatus").value = ""; $("#logField").value = ""; $("#logBrandQ").value = "";
+  logPage = 1; loadLogPage();
+});
+$("#logList").addEventListener("click", e => {
+  if (e.target.closest("[data-log-expand]")) return; /* 展開按鈕：由文件層委派處理，不開明細 */
+  const tr = e.target.closest("tr[data-brand]");
+  if (tr) openBrandById(tr.dataset.brand);
+});
 
 /* ---------- 配方管理總覽（formula v2.0 Phase 1：唯讀版） ----------
    讀 v_formula_completeness（sql-60）；篩選：成分名（ilike 查 crm_formula_ingredients 再對回產品）、
