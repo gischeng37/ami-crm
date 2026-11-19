@@ -155,6 +155,18 @@ a{color:var(--accent)}
 .tag.grey{background:#eceef0;color:#667085;font-weight:700}
 .formrow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
 .formrow .full{grid-column:1/-1}
+/* 配方管理 Phase 2：成分主檔子分頁（部署 #24） */
+.subtabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.subtabs button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 18px;font-weight:700;min-height:44px}
+.subtabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.ingprop{border:1px solid var(--line);border-radius:8px;padding:10px;margin:8px 0;font-size:14px;overflow-wrap:anywhere}
+.ingprop .meta{color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+.ingprop .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.ingprop .acts .btn{min-height:44px}
+.ingexpand{background:#f7fafc}
+.ingexpand td{font-size:13px}
+.ingaliasform{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.ingaliasform input{flex:1;min-width:180px}
 @media (max-width:768px){
   .filters{grid-template-columns:1fr 1fr}
   .filters .full-m{grid-column:1/-1}
@@ -175,6 +187,9 @@ a{color:var(--accent)}
   .kv{grid-template-columns:1fr}
   .kv dt{margin-top:6px}
   .editgrid,.formrow{grid-template-columns:1fr}
+  .ingprop .acts{flex-direction:column}
+  .ingprop .acts .btn{width:100%}
+  .subtabs{flex-wrap:nowrap;overflow-x:auto}
   body{font-size:14px}
 }
 @media (max-width:480px){
@@ -188,6 +203,10 @@ a{color:var(--accent)}
   .dsrow{grid-template-columns:1fr;border:1px solid var(--line);border-radius:8px;margin:8px 0;padding:10px 12px}
   .hrow{grid-template-columns:1fr;border:1px solid var(--line);border-radius:8px;margin:8px 0;padding:10px 12px}
   .dsrange{flex-direction:column;align-items:stretch}
+  #ingList .btn{min-height:44px}
+  .ingaliasform{flex-direction:column}
+  .ingaliasform input{min-width:0}
+  .ingaliasform .btn{width:100%;min-height:44px}
 }
 </style>
 </head>
@@ -357,8 +376,13 @@ a{color:var(--accent)}
       </div>
       <p id="leadsMsg" class="err"></p>
     </div>
-    <!-- 配方管理（formula v2.0 Phase 1：總覽唯讀版；不做跨品牌配方對比） -->
+    <!-- 配方管理（formula v2.0 Phase 1 總覽＋ Phase 2 成分主檔子分頁；不做跨品牌配方對比） -->
     <div id="formulasView" class="hidden">
+      <div class="subtabs" role="group">
+        <button type="button" id="fxSubOverviewBtn" class="on" data-i18n="tabFormulasOverview">產品總覽</button>
+        <button type="button" id="fxSubIngredientsBtn" data-i18n="tabFormulasIngredients">成分主檔</button>
+      </div>
+      <div id="fxOverviewWrap">
       <div class="card">
         <div class="stats" id="fxStats"></div>
       </div>
@@ -384,6 +408,44 @@ a{color:var(--accent)}
         <div id="fxEmpty" class="empty hidden" data-i18n="fxEmpty">沒有符合的產品。</div>
       </div>
       <p id="fxMsg" class="err"></p>
+      </div><!-- /fxOverviewWrap -->
+      <!-- 成分主檔子分頁（formula v2.0 Phase 2，部署 #24） -->
+      <div id="ingView" class="hidden">
+        <div class="card">
+          <h3 data-i18n="ingTitle">成分主檔</h3>
+          <div class="stats" id="ingStats"></div>
+        </div>
+        <div class="card">
+          <div class="fxhead"><h3><span data-i18n="ingProposalTitle">待審歸一化提案</span> <span id="ingProposalCount" class="tag b">0</span></h3></div>
+          <div id="ingProposalList"></div>
+          <div id="ingProposalEmpty" class="empty hidden" data-i18n="ingProposalEmpty">目前沒有待審提案。</div>
+          <div id="ingProposalMsg" class="ok"></div>
+        </div>
+        <div class="card">
+          <div class="lfilters">
+            <div class="full-m"><label data-i18n="ingSearch">標準名／別名</label><input id="ingSearch" type="search" data-i18n-ph="ingSearchPh" placeholder="標準名或別名…"></div>
+            <div><label data-i18n="ingColCategory">類別</label><select id="ingCategory"><option value="" data-i18n="all">全部</option></select></div>
+            <div><label data-i18n="ingColProducts">使用產品數</label><select id="ingUsage"><option value="" data-i18n="all">全部</option><option value="has" data-i18n="ingFilterHasProducts">有使用產品</option><option value="none" data-i18n="ingFilterUnused">未使用</option></select></div>
+            <div><label data-i18n="ingColAmountRange">含量範圍</label><select id="ingAmount"><option value="" data-i18n="all">全部</option><option value="has" data-i18n="ingFilterHasAmount">有含量範圍</option><option value="none" data-i18n="ingFilterNoAmount">無含量範圍</option></select></div>
+            <div><button id="ingResetBtn" class="btn ghost" type="button" data-i18n="reset">重設</button></div>
+          </div>
+        </div>
+        <div class="card" style="padding-top:4px">
+          <div id="ingMeta" class="muted" style="padding:10px 8px 0"></div>
+          <div class="fxwrap"><table class="fx" id="ingTable">
+            <thead><tr>
+              <th data-i18n="ingColCanonical">標準名</th><th data-i18n="ingColZh">中文名</th><th data-i18n="ingColCategory">類別</th>
+              <th class="num" data-i18n="ingColProducts">使用產品數</th><th class="num" data-i18n="ingColBrands">使用品牌數</th>
+              <th data-i18n="ingColAmountRange">含量範圍</th><th class="num" data-i18n="ingColAliases">別名數</th>
+              <th data-i18n="colActions">操作</th>
+            </tr></thead>
+            <tbody id="ingList"></tbody>
+          </table></div>
+          <div id="ingEmpty" class="empty hidden" data-i18n="ingEmpty">沒有符合的標準成分。</div>
+          <div id="ingNotReady" class="empty hidden" data-i18n="ingNotReady">成分主檔尚未建立，請先執行 sql-60。</div>
+        </div>
+        <p id="ingMsg" class="err"></p>
+      </div>
     </div>
     <!-- 市場熱度（部署 #23；設計 v1.0：熱度分數 v1 只看 B 訊號在售產品數，A 評論／C 搜尋量／D 新品速度待補，缺訊號顯示「待補」不填零） -->
     <div id="hotnessView" class="hidden">
@@ -604,6 +666,25 @@ const I18N = {
     fxEmpty:"沒有符合的產品。", fxShowing:"共 {n} 個產品，顯示 {m} 個", fxLoadFail:"配方總覽載入失敗：",
     fxDashTitle:"配方完整度", fxDashBrands:"有產品的品牌", fxDashProducts:"產品總數", fxDashRate:"含量揭露率",
     fxDashBlend:"專有混合產品", fxDashNoLabel:"無標籤鏡像產品", fxDashViewNotReady:"配方視圖尚未建立（請先執行 sql-60）。",
+    /* 配方管理 Phase 2：成分主檔＋歸一化提案（部署 #24） */
+    tabFormulasOverview:"產品總覽", tabFormulasIngredients:"成分主檔",
+    ingTitle:"成分主檔", ingSearch:"標準名／別名", ingSearchPh:"標準名或別名…",
+    ingColCanonical:"標準名", ingColZh:"中文名", ingColCategory:"類別", ingColProducts:"使用產品數", ingColBrands:"使用品牌數",
+    ingColAmountRange:"含量範圍", ingColAliases:"別名數",
+    ingCatElectrolyte:"電解質", ingCatVitamin:"維生素", ingCatMineral:"礦物質", ingCatAminoAcid:"胺基酸", ingCatBotanical:"植物萃取", ingCatOther:"其他",
+    ingFilterHasProducts:"有使用產品", ingFilterUnused:"未使用", ingFilterHasAmount:"有含量範圍", ingFilterNoAmount:"無含量範圍",
+    ingAliasHit:"別名命中：{a}", ingUsageTitle:"使用產品", ingUsageEmpty:"尚無產品使用此成分。", ingUsageUnmappedNote:"未歸一化列不計入（ingredient_id 為空）。",
+    ingAliasesTitle:"別名", ingAliasesEmpty:"尚無別名。", ingAliasMerged:"已併入", ingAliasSource:"來源", ingProposeAlias:"提案別名",
+    ingProposePh:"新寫法，例如 trimagnesium citrate…", ingProposeSubmit:"送出提案", ingProposeCancel:"取消",
+    ingProposeSent:"提案已送出，待審核。", ingProposeNeedAlias:"請先輸入新寫法。", ingProposeNeedBrand:"此成分尚無使用產品，無法建立有品牌歸屬的提案。",
+    ingProposalTitle:"待審歸一化提案", ingProposalPending:"待審核", ingProposalApprove:"批准", ingProposalHold:"暫緩", ingProposalReject:"拒絕",
+    ingProposalApproveAll:"批准此寫法全部（{n} 列）", ingProposalApproveAllShort:"批准全部（{n}）",
+    ingProposalNoSuggestion:"無建議標準名", ingProposalSuggested:"建議標準名：{c}", ingProposalEmpty:"目前沒有待審提案。",
+    ingProposalApproved:"已批准，別名將於合併後併入。", ingProposalHeld:"已暫緩，留待下批。", ingProposalRejected:"已拒絕，寫法保持未歸一化。",
+    ingProposalFail:"操作失敗：", ingLoadFail:"成分主檔載入失敗：", ingNotReady:"成分主檔尚未建立，請先執行 sql-60。",
+    ingShowing:"共 {n} 個標準成分，顯示 {m} 個", ingTotal:"標準成分總數", ingDisclosedRate:"含量揭露率",
+    ingStatProducts:"使用產品數", ingStatRows:"成分列總數", ingStatDisclosed:"已揭露列數", ingStatUndisclosed:"未揭露列數",
+    ingEmpty:"沒有符合的標準成分。", ingProposalSource:"來源", ingProposalEvidence:"證據", ingProposalConfidence:"信心度",
     /* 市場熱度（部署 #23；設計 v1.0） */
     tabHotness:"市場熱度",
     hotDashTitle:"本週最熱 Top 5", hotDashGo:"前往市場熱度",
@@ -746,6 +827,25 @@ const I18N = {
     fxEmpty:"No matching products.", fxShowing:"{n} products in total, showing {m}", fxLoadFail:"Failed to load formula overview: ",
     fxDashTitle:"Formula completeness", fxDashBrands:"Brands with products", fxDashProducts:"Total products", fxDashRate:"Disclosure rate",
     fxDashBlend:"Proprietary-blend products", fxDashNoLabel:"Products without label image", fxDashViewNotReady:"Formula view not created yet (run sql-60 first).",
+    /* Formula management Phase 2: ingredient master + normalisation proposals (deployment #24) */
+    tabFormulasOverview:"Products", tabFormulasIngredients:"Ingredients",
+    ingTitle:"Ingredient Master", ingSearch:"Name / alias", ingSearchPh:"Canonical name or alias…",
+    ingColCanonical:"Canonical name", ingColZh:"Chinese name", ingColCategory:"Category", ingColProducts:"Products", ingColBrands:"Brands",
+    ingColAmountRange:"Amount range", ingColAliases:"Aliases",
+    ingCatElectrolyte:"Electrolyte", ingCatVitamin:"Vitamin", ingCatMineral:"Mineral", ingCatAminoAcid:"Amino acid", ingCatBotanical:"Botanical", ingCatOther:"Other",
+    ingFilterHasProducts:"Used in products", ingFilterUnused:"Unused", ingFilterHasAmount:"Has amount range", ingFilterNoAmount:"No amount range",
+    ingAliasHit:"Alias match: {a}", ingUsageTitle:"Used in products", ingUsageEmpty:"No products use this ingredient yet.", ingUsageUnmappedNote:"Unmapped rows are excluded (empty ingredient_id).",
+    ingAliasesTitle:"Aliases", ingAliasesEmpty:"No aliases yet.", ingAliasMerged:"Merged", ingAliasSource:"Source", ingProposeAlias:"Propose alias",
+    ingProposePh:"New spelling, e.g. trimagnesium citrate…", ingProposeSubmit:"Submit proposal", ingProposeCancel:"Cancel",
+    ingProposeSent:"Proposal submitted, pending review.", ingProposeNeedAlias:"Enter the new spelling first.", ingProposeNeedBrand:"This ingredient has no products yet, so a proposal cannot be attributed to a brand.",
+    ingProposalTitle:"Pending normalisation proposals", ingProposalPending:"Pending", ingProposalApprove:"Approve", ingProposalHold:"Hold", ingProposalReject:"Reject",
+    ingProposalApproveAll:"Approve all for this spelling ({n} rows)", ingProposalApproveAllShort:"Approve all ({n})",
+    ingProposalNoSuggestion:"No suggested canonical name", ingProposalSuggested:"Suggested canonical: {c}", ingProposalEmpty:"No pending proposals.",
+    ingProposalApproved:"Approved; the alias will merge on the next merge run.", ingProposalHeld:"Held for a later batch.", ingProposalRejected:"Rejected; the spelling stays unmapped.",
+    ingProposalFail:"Action failed: ", ingLoadFail:"Failed to load ingredient master: ", ingNotReady:"Ingredient master not set up yet; run sql-60 first.",
+    ingShowing:"{m} of {n} canonical ingredients shown", ingTotal:"Canonical ingredients", ingDisclosedRate:"Disclosure rate",
+    ingStatProducts:"Products using ingredients", ingStatRows:"Ingredient rows", ingStatDisclosed:"Disclosed rows", ingStatUndisclosed:"Undisclosed rows",
+    ingEmpty:"No matching canonical ingredients.", ingProposalSource:"Source", ingProposalEvidence:"Evidence", ingProposalConfidence:"Confidence",
     /* Market hotness (deployment #23; design v1.0) */
     tabHotness:"Market Hotness",
     hotDashTitle:"Hottest This Week — Top 5", hotDashGo:"Open market hotness",
@@ -878,6 +978,23 @@ async function sb(path, opts) {
   const txt = await res.text();
   return txt ? JSON.parse(txt) : null;
 }
+/* 分頁查詢：回傳 {rows, total}；total 取自 PostgREST Content-Range（需 Prefer: count=exact），
+   無此標頭時退回列數。配方 Phase 2 成分主檔用它取 58 列總數（mock 只回 8 列樣本頁）。 */
+async function sbPage(path, opts) {
+  const res = await fetch(SB_URL + path, opts || {});
+  if (res.status === 401) { signOut(true); throw new Error(t("needLogin")); }
+  if (!res.ok) {
+    let msg = res.status + " " + res.statusText;
+    try { const j = await res.json(); if (j.message) msg = j.message; else if (j.error_description) msg = j.error_description; } catch(e) {}
+    throw new Error(msg);
+  }
+  const txt = await res.text();
+  const rows = txt ? JSON.parse(txt) : [];
+  let total = Array.isArray(rows) ? rows.length : 0;
+  const cr = res.headers.get("content-range");
+  if (cr) { const m = /\/(\d+)\s*$/.exec(cr); if (m) total = Number(m[1]); }
+  return { rows: Array.isArray(rows) ? rows : [], total };
+}
 const api = {
   companies: () => sb("/rest/v1/crm_companies?select=*&order=name.asc&limit=1000", { headers: headers() }),
   patchCompany: (id, body) => sb("/rest/v1/crm_companies?id=eq." + encodeURIComponent(id), { method: "PATCH", headers: headers(true), body: JSON.stringify(body) }),
@@ -931,6 +1048,20 @@ const api = {
   hotness: () => sb("/rest/v1/crm_brand_hotness?select=*&order=snapshot_date.desc,score.desc&limit=200", { headers: headers() }),
   /* 成分篩選：對 ingredient_name 做 ilike，只回 product_id */
   ingredientsByName: name => sb("/rest/v1/crm_formula_ingredients?ingredient_name=ilike.*"+ encodeURIComponent(name) + "*&select=product_id&limit=1000", { headers: headers() }),
+  /* 成分主檔（formula v2.0 Phase 2，部署 #24）：讀 crm_ingredients／crm_ingredient_aliases／v_ingredient_usage；
+     寫入只走 crm_research_log（人工提案 POST pending 列；批准／暫緩／拒絕 PATCH 該列 status），
+     絕不直接寫 crm_ingredients／crm_ingredient_aliases／crm_formula_ingredients。 */
+  ingredients: () => sbPage("/rest/v1/crm_ingredients?select=*&order=canonical_name.asc&limit=1000", { headers: { ...headers(), Prefer: "count=exact" } }),
+  ingredientsByCanonical: q => sb("/rest/v1/crm_ingredients?canonical_name=ilike.*" + encodeURIComponent(q) + "*&select=*&order=canonical_name.asc&limit=100", { headers: headers() }),
+  ingredientsByIds: ids => sb("/rest/v1/crm_ingredients?id=in.(" + ids.map(encodeURIComponent).join(",") + ")&select=*&limit=100", { headers: headers() }),
+  ingredientAliases: () => sb("/rest/v1/crm_ingredient_aliases?select=*,crm_ingredients(canonical_name)&order=alias.asc&limit=1000", { headers: headers() }),
+  aliasesByAlias: q => sb("/rest/v1/crm_ingredient_aliases?alias=ilike.*" + encodeURIComponent(q) + "*&select=*,crm_ingredients(canonical_name)&limit=100", { headers: headers() }),
+  ingredientUsage: () => sb("/rest/v1/v_ingredient_usage?select=*&order=product_count.desc&limit=1000", { headers: headers() }),
+  aliasProposals: () => sb("/rest/v1/crm_research_log?field=eq.ingredient_alias_proposal&status=eq.pending&select=*&order=created_at.desc&limit=200", { headers: headers() }),
+  formulaIngredientsByIngredient: id => sb("/rest/v1/crm_formula_ingredients?ingredient_id=eq." + encodeURIComponent(id) + "&select=product_id,ingredient_name,amount_value,amount_unit,amount_status&limit=500", { headers: headers() }),
+  productsForIngredients: () => sb("/rest/v1/crm_products?select=id,brand_id,product_name,asin&order=product_name.asc&limit=1000", { headers: headers() }),
+  patchResearchLog: (id, body) => sb("/rest/v1/crm_research_log?id=eq." + encodeURIComponent(id), { method: "PATCH", headers: headers(true), body: JSON.stringify(body) }),
+  addResearchLog: body => sb("/rest/v1/crm_research_log", { method: "POST", headers: headers(true), body: JSON.stringify(body) }),
   reviewsAll: () => sb("/rest/v1/crm_reviews?select=brand_id&limit=1000", { headers: headers() }),
   signalsRedditAll: () => sb("/rest/v1/crm_signals?source=eq.reddit&select=brand_id&limit=1000", { headers: headers() }),
 };
@@ -946,7 +1077,7 @@ function applyLang() {
   if (current) renderDetail(current, true);
   if (currentLead) openLeadDetail(currentLead);
   if (mainViewTab === "dashboard") renderDashboard();
-  if (mainViewTab === "formulas") renderFormulas();
+  if (mainViewTab === "formulas") { renderFormulas(); if (fxSubTab === "ingredients") { renderIngredients(); const ipm = $("#ingProposalMsg"); if (ipm) ipm.textContent = ""; } }
   if (mainViewTab === "hotness") renderHotness();
   syncStickyTop();
 }
@@ -1450,7 +1581,7 @@ function showMainTab(which) {
   $("#viewHotnessBtn").classList.toggle("on", which === "hotness");
   if (which === "leads" && !leadsLoaded) loadLeads();
   if (which === "dashboard") renderDashboard();
-  if (which === "formulas") { if (!fxLoaded) loadFormulas(); else renderFormulas(); }
+  if (which === "formulas") { if (!fxLoaded) loadFormulas(); else renderFormulas(); if (fxSubTab === "ingredients") { if (!ingLoaded) loadIngredients(); else renderIngredients(); } }
   if (which === "hotness") { if (!hotLoaded) loadHotness(); else renderHotness(); }
 }
 $("#viewCompaniesBtn").addEventListener("click", () => showMainTab("companies"));
@@ -2405,6 +2536,384 @@ $("#fxResetBtn").addEventListener("click", () => {
   fxIngredientIds = null;
   renderFormulas();
 });
+
+/* ---------- 成分主檔＋歸一化提案（formula v2.0 Phase 2，部署 #24） ----------
+   子分頁在配方管理主分頁內（設計 §六：總覽 A＋主檔 B 同一主分頁；規格書 §1）。
+   讀：crm_ingredients（Prefer count=exact 取總數）／crm_ingredient_aliases／v_ingredient_usage／
+   crm_research_log（field=ingredient_alias_proposal, status=pending）。
+   寫入邊界：只寫 crm_research_log——人工提案 POST pending 列；批准／暫緩／拒絕 PATCH 該列 status。
+   絕不直接寫 crm_ingredients／crm_ingredient_aliases／crm_formula_ingredients
+   （別名併入＋ingredient_id 回填由合併程式在批准後執行，見決策檔 D1／規格書 §4.2）。
+   任一查詢失敗只影響本區，顯示友善錯誤，不拋 pageerror；表未建（sql-60 未執行）顯示 ingNotReady。 */
+const ING_CATS = ["electrolyte", "vitamin", "mineral", "amino_acid", "botanical", "other"];
+const ING_CAT_KEY = { electrolyte: "ingCatElectrolyte", vitamin: "ingCatVitamin", mineral: "ingCatMineral", amino_acid: "ingCatAminoAcid", botanical: "ingCatBotanical", other: "ingCatOther" };
+const ingCatLabel = c => t(ING_CAT_KEY[c] || "ingCatOther");
+let fxSubTab = "overview";   /* 配方管理子分頁：overview（產品總覽）｜ingredients（成分主檔） */
+let ingRows = [];            /* 基準列：crm_ingredients 回傳列（正式全量 ≤1000；mock 為 8 列樣本頁） */
+let ingTotal = 0;            /* 標準成分總數（Content-Range；無標頭時退回列數） */
+let ingUsageMap = {};        /* ingredient_id → v_ingredient_usage 列 */
+let ingUsageByName = {};     /* canonical_name 小寫 → usage 列（視圖無 id 時的備援） */
+let ingAliasCount = {};      /* ingredient_id → 別名數 */
+let ingAliasesById = {};     /* ingredient_id → 別名列 */
+let ingProposals = [];       /* 待審提案列（crm_research_log，status=pending） */
+let ingProductsById = {};    /* product_id → {brand_id, product_name, asin}（使用清單對照用） */
+let ingLoaded = false;
+let ingNotReady = false;
+let ingSearchRows = null;    /* 搜尋中：伺服器 ilike 回傳列；無搜尋時 null */
+let ingAliasHits = {};       /* ingredient_id → 命中的別名原文 */
+let ingExpandedUsage = null;     /* 展開使用產品清單的 ingredient_id */
+let ingExpandedAliases = null;   /* 展開別名清單的 ingredient_id */
+let ingProposeFor = null;        /* 開啟人工提案表單的 ingredient_id */
+let ingUsageCache = {};          /* ingredient_id → 使用產品列（已展開過的快取） */
+let ingBusy = null;              /* 進行中的提案操作（防重複點按） */
+let ingSearchTimer = null;
+function showFxSubTab(which) {
+  fxSubTab = which;
+  $("#fxSubOverviewBtn").classList.toggle("on", which === "overview");
+  $("#fxSubIngredientsBtn").classList.toggle("on", which === "ingredients");
+  $("#fxOverviewWrap").classList.toggle("hidden", which !== "overview");
+  $("#ingView").classList.toggle("hidden", which !== "ingredients");
+  if (which === "ingredients") { if (!ingLoaded) loadIngredients(); else renderIngredients(); }
+}
+$("#fxSubOverviewBtn").addEventListener("click", () => showFxSubTab("overview"));
+$("#fxSubIngredientsBtn").addEventListener("click", () => showFxSubTab("ingredients"));
+function ingUsageOf(r) {
+  return ingUsageMap[r.id] || ingUsageByName[(r.canonical_name || "").toLowerCase()] || null;
+}
+function ingHasAmount(u) {
+  if (!u) return false;
+  const mn = u.min_amount != null ? u.min_amount : u.min;
+  const mx = u.max_amount != null ? u.max_amount : u.max;
+  return mn != null && mx != null;
+}
+function ingAmountText(u) {
+  if (!ingHasAmount(u)) return t("fxNotDisclosed");
+  const mn = u.min_amount != null ? u.min_amount : u.min;
+  const mx = u.max_amount != null ? u.max_amount : u.max;
+  const unit = u.amount_unit || u.unit || "";
+  const s = v => { const n = Number(v); return Number.isFinite(n) && n % 1 === 0 ? String(n) : String(v); };
+  return mn === mx ? s(mn) + (unit ? " " + unit : "") : s(mn) + "–" + s(mx) + (unit ? " " + unit : "");
+}
+function renderIngStats() {
+  const el = $("#ingStats");
+  if (!el) return;
+  const s = fxSummary(fxRows);
+  el.innerHTML =
+    `<div class="stat"><b>${ingTotal}</b><span>${esc(t("ingTotal"))}</span></div>` +
+    `<div class="stat"><b>${s.total}</b><span>${esc(t("ingStatProducts"))}</span></div>` +
+    `<div class="stat"><b>${s.ingTotal}</b><span>${esc(t("ingStatRows"))}</span></div>` +
+    `<div class="stat"><b>${s.disc}</b><span>${esc(t("ingStatDisclosed"))}</span></div>` +
+    `<div class="stat"><b>${s.ingTotal - s.disc}</b><span>${esc(t("ingStatUndisclosed"))}</span></div>` +
+    `<div class="stat"><b>${s.rate}%</b><span>${esc(t("ingDisclosedRate"))} (${s.disc}/${s.ingTotal})</span></div>`;
+}
+function renderIngFilterOptions() {
+  const el = $("#ingCategory"), cur = el.value;
+  const keep = el.querySelector("option[value='']");
+  el.innerHTML = "";
+  el.appendChild(keep);
+  ING_CATS.forEach(v => { const o = document.createElement("option"); o.value = v; o.textContent = ingCatLabel(v); el.appendChild(o); });
+  el.value = cur;
+}
+function ingFiltered() {
+  const list = ingSearchRows || ingRows;
+  const cat = $("#ingCategory").value, usage = $("#ingUsage").value, amt = $("#ingAmount").value;
+  return list.filter(r => {
+    const u = ingUsageOf(r);
+    const pc = u ? (u.product_count || 0) : 0;
+    if (cat && (r.category || "other") !== cat) return false;
+    if (usage === "has" && pc < 1) return false;
+    if (usage === "none" && pc >= 1) return false;
+    if (amt === "has" && !ingHasAmount(u)) return false;
+    if (amt === "none" && ingHasAmount(u)) return false;
+    return true;
+  });
+}
+/* 提案 note 格式（決策檔 D1.1）：「建議標準名：<canonical 或 null>；<依據一句話>」 */
+function ingSuggestedCanonical(r) {
+  const m = /建議標準名：([^；;]+)/.exec(r.note || "");
+  if (!m) return null;
+  const v = m[1].trim();
+  return (v === "null" || v === "無" || v === "") ? null : v;
+}
+function ingProposalAsin(r) {
+  const m = /^formula:([^:]+):/.exec(r.source_ref || "");
+  return m ? m[1] : "";
+}
+function renderIngProposals() {
+  const el = $("#ingProposalList");
+  if (!el) return;
+  const countEl = $("#ingProposalCount");
+  if (countEl) countEl.textContent = String(ingProposals.length);
+  $("#ingProposalEmpty").classList.toggle("hidden", ingProposals.length > 0);
+  const groups = {};
+  ingProposals.forEach(r => { const k = r.value || ""; (groups[k] = groups[k] || []).push(r); });
+  el.innerHTML = Object.keys(groups).map(spelling => {
+    const rows = groups[spelling];
+    const items = rows.map(r => {
+      const sug = ingSuggestedCanonical(r);
+      const asin = ingProposalAsin(r);
+      const src = [brandNameById(r.brand_id), asin].filter(Boolean).join(" · ");
+      const conf = r.confidence ? ` · ${esc(t("ingProposalConfidence"))}: ${esc(r.confidence)}` : "";
+      const ev = r.evidence_url ? ` · <a href="${esc(r.evidence_url)}" target="_blank" rel="noopener">${esc(t("ingProposalEvidence"))}</a>` : "";
+      const by = r.created_by ? ` · ${esc(r.created_by)}` : "";
+      return `<div style="padding:8px 0;border-top:1px solid var(--line)">
+        <b>${esc(r.value || "")}</b> <span class="tag b">${esc(t("ingProposalPending"))}</span><br>
+        <span class="muted">${sug ? esc(t("ingProposalSuggested").replace("{c}", sug)) : esc(t("ingProposalNoSuggestion"))}</span><br>
+        <span class="meta">${esc(t("ingProposalSource"))}: ${esc(src || "—")} · ${esc(r.observed_at || r.created_at || "")}${conf}${ev}${by}</span>
+        ${r.note ? `<br><span class="meta">${esc(r.note)}</span>` : ""}
+        <div class="acts">
+          <button type="button" class="btn small" data-ing-act="approve" data-ing-id="${esc(r.id)}">${esc(t("ingProposalApprove"))}</button>
+          <button type="button" class="btn ghost small" data-ing-act="hold" data-ing-id="${esc(r.id)}">${esc(t("ingProposalHold"))}</button>
+          <button type="button" class="btn ghost small" data-ing-act="reject" data-ing-id="${esc(r.id)}">${esc(t("ingProposalReject"))}</button>
+        </div></div>`;
+    }).join("");
+    const short = window.innerWidth <= 480;
+    const allLabel = (short ? t("ingProposalApproveAllShort") : t("ingProposalApproveAll")).replace("{n}", rows.length);
+    return `<div class="ingprop">${items}
+      <div class="acts"><button type="button" class="btn small" data-ing-act="approve-all" data-ing-spelling="${esc(spelling)}" title="${esc(t("ingProposalApproveAll").replace("{n}", rows.length))}">${esc(allLabel)}</button></div></div>`;
+  }).join("");
+}
+async function ingLoadUsage(ingId) {
+  if (ingUsageCache[ingId]) return ingUsageCache[ingId];
+  if (!Object.keys(ingProductsById).length) {
+    try { const ps = await api.productsForIngredients(); (ps || []).forEach(p => { ingProductsById[p.id] = p; }); } catch (e) { /* 產品對照失敗時只顯示 ingredient_name，不拋錯 */ }
+  }
+  const rows = await api.formulaIngredientsByIngredient(ingId);
+  ingUsageCache[ingId] = Array.isArray(rows) ? rows : [];
+  return ingUsageCache[ingId];
+}
+function ingUsageRowsHtml(ingId) {
+  const rows = ingUsageCache[ingId] || [];
+  let h = `<div><b>${esc(t("ingUsageTitle"))}</b>`;
+  h += rows.length ? rows.map(r => {
+    const p = ingProductsById[r.product_id];
+    const brand = p ? brandNameById(p.brand_id) : "";
+    const pname = p ? (p.product_name || "") : "";
+    const asin = p && p.asin ? `<a href="https://www.amazon.com/dp/${esc(p.asin)}" target="_blank" rel="noopener">${esc(p.asin)}</a>` : "—";
+    const amt = r.amount_value != null ? `${esc(String(r.amount_value))}${r.amount_unit ? " " + esc(r.amount_unit) : ""}` : esc(t("fxNotDisclosed"));
+    return `<div class="subitem"><b>${esc(brand)}</b> · ${esc(pname)} · ${asin}<br><span class="meta">${esc(r.ingredient_name || "")} · ${amt}</span></div>`;
+  }).join("") : `<div class="muted">${esc(t("ingUsageEmpty"))}</div>`;
+  return h + `<div class="muted">${esc(t("ingUsageUnmappedNote"))}</div></div>`;
+}
+function ingAliasesHtml(r) {
+  const list = ingAliasesById[r.id] || [];
+  let h = `<div><b>${esc(t("ingAliasesTitle"))}</b>`;
+  h += list.length ? list.map(a => `<div class="subitem"><b>${esc(a.alias)}</b> <span class="tag green">${esc(t("ingAliasMerged"))}</span><br><span class="meta">${esc(t("ingAliasSource"))}: ${esc(a.source || "—")} · ${esc(a.created_at || "")}</span></div>`).join("") : `<div class="muted">${esc(t("ingAliasesEmpty"))}</div>`;
+  if (ingProposeFor === r.id) {
+    h += `<div class="ingaliasform"><input id="ingProposeInput" type="text" placeholder="${esc(t("ingProposePh"))}"><button type="button" class="btn small" data-ing-act="propose-submit" data-ing-id="${esc(r.id)}">${esc(t("ingProposeSubmit"))}</button><button type="button" class="btn ghost small" data-ing-act="propose-cancel" data-ing-id="${esc(r.id)}">${esc(t("ingProposeCancel"))}</button></div>`;
+  }
+  return h + "</div>";
+}
+function renderIngredients() {
+  if (!ingLoaded && !ingNotReady) return;
+  renderIngStats();
+  renderIngFilterOptions();
+  renderIngProposals();
+  const list = ingFiltered();
+  $("#ingMeta").textContent = t("ingShowing").replace("{n}", ingTotal).replace("{m}", list.length);
+  const box = $("#ingList");
+  $("#ingEmpty").classList.toggle("hidden", list.length > 0 || ingNotReady);
+  $("#ingNotReady").classList.toggle("hidden", !ingNotReady);
+  let html = "";
+  list.forEach(r => {
+    const u = ingUsageOf(r);
+    const pc = u ? (u.product_count || 0) : 0;
+    const bc = u ? (u.brand_count || 0) : 0;
+    const ac = ingAliasCount[r.id] || 0;
+    const hit = ingAliasHits[r.id];
+    html += `<tr>` +
+      `<td>${esc(r.canonical_name || "")}${hit ? `<br><span class="muted">${esc(t("ingAliasHit").replace("{a}", hit))}</span>` : ""}</td>` +
+      `<td>${esc(r.display_name_zh || "—")}</td>` +
+      `<td>${esc(ingCatLabel(r.category || "other"))}</td>` +
+      `<td class="num"><button type="button" class="btn ghost small" data-ing-act="usage" data-ing-id="${esc(r.id)}">${pc}</button></td>` +
+      `<td class="num">${bc}</td>` +
+      `<td>${esc(ingAmountText(u))}</td>` +
+      `<td class="num"><button type="button" class="btn ghost small" data-ing-act="aliases" data-ing-id="${esc(r.id)}">${ac}</button></td>` +
+      `<td><button type="button" class="btn ghost small" data-ing-act="propose" data-ing-id="${esc(r.id)}">${esc(t("ingProposeAlias"))}</button></td></tr>`;
+    if (ingExpandedUsage === r.id) html += `<tr class="ingexpand"><td colspan="8">${ingUsageRowsHtml(r.id)}</td></tr>`;
+    if (ingExpandedAliases === r.id) html += `<tr class="ingexpand"><td colspan="8">${ingAliasesHtml(r)}</td></tr>`;
+  });
+  box.innerHTML = html;
+}
+async function loadIngredients() {
+  const msg = $("#ingMsg");
+  if (msg) msg.textContent = "";
+  try { if (!fxLoaded) await loadFormulas(); } catch (e) { /* 總覽載入失敗不擋成分主檔（統計缺 fxRows 時以 0 計） */ }
+  let ingErr = null;
+  try {
+    const page = await api.ingredients();
+    ingRows = page.rows || [];
+    ingTotal = page.total || ingRows.length;
+    ingNotReady = false;
+  } catch (e) {
+    ingErr = e;
+    ingRows = []; ingTotal = 0; ingNotReady = true;
+  }
+  try {
+    const aliases = await api.ingredientAliases();
+    ingAliasCount = {}; ingAliasesById = {};
+    (aliases || []).forEach(a => {
+      if (!a.ingredient_id) return;
+      ingAliasCount[a.ingredient_id] = (ingAliasCount[a.ingredient_id] || 0) + 1;
+      (ingAliasesById[a.ingredient_id] = ingAliasesById[a.ingredient_id] || []).push(a);
+    });
+  } catch (e) { if (!ingErr) ingErr = e; }
+  try {
+    const usage = await api.ingredientUsage();
+    ingUsageMap = {}; ingUsageByName = {};
+    (usage || []).forEach(u => {
+      if (u.ingredient_id) ingUsageMap[u.ingredient_id] = u;
+      if (u.canonical_name) ingUsageByName[String(u.canonical_name).toLowerCase()] = u;
+    });
+  } catch (e) { if (!ingErr) ingErr = e; }
+  try {
+    ingProposals = await api.aliasProposals() || [];
+    /* 提案來源品牌若在名單池（leads 未載入時 brandNameById 只回 id），順手載入名單再重繪，
+       與點產品列開明細同一模式（loadLeads 有 in-flight guard，不重複發請求）。 */
+    if (ingProposals.some(r => r.brand_id && !companies.some(c => c.id === r.brand_id)) && !leadsLoaded) {
+      loadLeads().then(() => { if (fxSubTab === "ingredients") renderIngredients(); }).catch(() => {});
+    }
+  } catch (e) { if (!ingErr) ingErr = e; ingProposals = []; }
+  ingLoaded = true;
+  if (msg && ingErr && !ingNotReady) { msg.textContent = t("ingLoadFail") + ingErr.message; msg.className = "err"; }
+  renderIngredients();
+}
+/* 搜尋：標準名／別名同時比對（伺服器 ilike；別名命中時該標準名列標示「別名命中」） */
+async function applyIngSearch() {
+  const q = $("#ingSearch").value.trim();
+  if (!q) { ingSearchRows = null; ingAliasHits = {}; renderIngredients(); return; }
+  const msg = $("#ingMsg");
+  try {
+    const [byName, byAlias] = await Promise.all([api.ingredientsByCanonical(q), api.aliasesByAlias(q)]);
+    const map = new Map();
+    (byName || []).forEach(r => map.set(r.id, r));
+    const hits = {};
+    const needIds = [];
+    (byAlias || []).forEach(a => {
+      if (a.ingredient_id) {
+        hits[a.ingredient_id] = a.alias;
+        if (!map.has(a.ingredient_id)) needIds.push(a.ingredient_id);
+      }
+    });
+    if (needIds.length) {
+      const extra = await api.ingredientsByIds([...new Set(needIds)]);
+      (extra || []).forEach(r => map.set(r.id, r));
+    }
+    ingSearchRows = [...map.values()];
+    ingAliasHits = hits;
+  } catch (e) {
+    ingSearchRows = [];
+    if (msg) { msg.textContent = t("ingLoadFail") + e.message; msg.className = "err"; }
+  }
+  renderIngredients();
+}
+$("#ingSearch").addEventListener("input", () => { clearTimeout(ingSearchTimer); ingSearchTimer = setTimeout(applyIngSearch, 300); });
+["ingCategory", "ingUsage", "ingAmount"].forEach(id => {
+  $("#" + id).addEventListener("change", () => renderIngredients());
+});
+$("#ingResetBtn").addEventListener("click", () => {
+  $("#ingSearch").value = ""; $("#ingCategory").value = ""; $("#ingUsage").value = ""; $("#ingAmount").value = "";
+  ingSearchRows = null; ingAliasHits = {};
+  ingExpandedUsage = null; ingExpandedAliases = null; ingProposeFor = null;
+  renderIngredients();
+});
+$("#ingList").addEventListener("click", async e => {
+  const btn = e.target.closest("[data-ing-act]");
+  if (!btn) return;
+  const ingId = btn.dataset.ingId, act = btn.dataset.ingAct;
+  if (act === "usage") {
+    if (ingExpandedUsage === ingId) { ingExpandedUsage = null; renderIngredients(); return; }
+    ingExpandedUsage = ingId; ingExpandedAliases = null;
+    try { await ingLoadUsage(ingId); } catch (err) {
+      const msg = $("#ingMsg");
+      if (msg) { msg.textContent = t("ingLoadFail") + err.message; msg.className = "err"; }
+    }
+    renderIngredients();
+  } else if (act === "aliases") {
+    ingExpandedAliases = ingExpandedAliases === ingId ? null : ingId;
+    ingExpandedUsage = null; ingProposeFor = null;
+    renderIngredients();
+  } else if (act === "propose") {
+    ingProposeFor = ingProposeFor === ingId ? null : ingId;
+    ingExpandedAliases = ingId; ingExpandedUsage = null;
+    renderIngredients();
+    const inp = $("#ingProposeInput"); if (inp) inp.focus();
+  } else if (act === "propose-submit") {
+    await ingSubmitProposal(ingId);
+  } else if (act === "propose-cancel") {
+    ingProposeFor = null; renderIngredients();
+  }
+});
+$("#ingProposalList").addEventListener("click", async e => {
+  const btn = e.target.closest("[data-ing-act]");
+  if (!btn || ingBusy) return;
+  const act = btn.dataset.ingAct;
+  if (act === "approve-all") { await ingApproveGroup(btn.dataset.ingSpelling); return; }
+  if (act === "approve" || act === "hold" || act === "reject") await ingProposalAction(btn.dataset.ingId, act);
+});
+async function ingProposalAction(id, act) {
+  const status = act === "approve" ? "approved" : act === "hold" ? "held" : "rejected";
+  const msgEl = $("#ingProposalMsg");
+  ingBusy = id;
+  try {
+    await api.patchResearchLog(id, { status });
+    ingProposals = ingProposals.filter(r => r.id !== id);
+    if (msgEl) { msgEl.textContent = t(act === "approve" ? "ingProposalApproved" : act === "hold" ? "ingProposalHeld" : "ingProposalRejected"); msgEl.className = "ok"; }
+    renderIngredients();
+  } catch (e) {
+    if (msgEl) { msgEl.textContent = t("ingProposalFail") + e.message; msgEl.className = "err"; }
+  } finally { ingBusy = null; }
+}
+async function ingApproveGroup(spelling) {
+  const rows = ingProposals.filter(r => (r.value || "") === spelling);
+  const msgEl = $("#ingProposalMsg");
+  ingBusy = "group:" + spelling;
+  try {
+    for (const r of rows) await api.patchResearchLog(r.id, { status: "approved" });
+    ingProposals = ingProposals.filter(r => (r.value || "") !== spelling);
+    if (msgEl) { msgEl.textContent = t("ingProposalApproved"); msgEl.className = "ok"; }
+    renderIngredients();
+  } catch (e) {
+    if (msgEl) { msgEl.textContent = t("ingProposalFail") + e.message; msgEl.className = "err"; }
+  } finally { ingBusy = null; }
+}
+async function ingSubmitProposal(ingId) {
+  const input = $("#ingProposeInput");
+  const alias = input ? input.value.trim() : "";
+  const msgEl = $("#ingProposalMsg");
+  if (!alias) { if (msgEl) { msgEl.textContent = t("ingProposeNeedAlias"); msgEl.className = "err"; } return; }
+  const row = ingRows.find(r => r.id === ingId) || (ingSearchRows || []).find(r => r.id === ingId);
+  if (!row) return;
+  /* 品牌上下文（決策檔 D1.2）：取該成分第一個使用產品的品牌；無使用產品不接受無品牌提案 */
+  let brandId = "", asin = "";
+  try {
+    await ingLoadUsage(ingId);
+    const u = ingUsageCache[ingId] || [];
+    if (u.length) { const p = ingProductsById[u[0].product_id]; if (p) { brandId = p.brand_id; asin = p.asin || ""; } }
+  } catch (e) { /* 使用清單載入失敗時視為無品牌上下文 */ }
+  if (!brandId) { if (msgEl) { msgEl.textContent = t("ingProposeNeedBrand"); msgEl.className = "err"; } return; }
+  const firstUsage = (ingUsageCache[ingId] || [])[0];
+  const fxr = firstUsage ? fxRows.find(r => r.product_id === firstUsage.product_id) : null;
+  const brandKind = fxr && fxr.brand_kind ? fxr.brand_kind : brandKindById(brandId);
+  const slug = alias.toLowerCase().replace(/\(.*?\)/g, "").trim().replace(/\s+/g, "-");
+  const body = {
+    brand_id: brandId, brand_kind: brandKind, field: "ingredient_alias_proposal", value: alias,
+    note: `建議標準名：${row.canonical_name}；App 內人工提案（來源產品 ${asin || "—"}）`,
+    evidence_url: asin ? `https://www.amazon.com/dp/${asin}` : "",
+    observed_at: new Date().toISOString().slice(0, 10), confidence: "medium", status: "pending",
+    source_type: "manual", source_ref: `formula:${asin}:${slug}`, created_by: "beacon"
+  };
+  try {
+    const created = await api.addResearchLog(body);
+    const nr = (created && !Array.isArray(created) ? created : Array.isArray(created) ? created[0] : null) || { ...body, id: "tmp-" + Date.now(), created_at: new Date().toISOString() };
+    ingProposals.unshift(nr);
+    ingProposeFor = null;
+    if (msgEl) { msgEl.textContent = t("ingProposeSent"); msgEl.className = "ok"; }
+    renderIngredients();
+  } catch (e) {
+    if (msgEl) { msgEl.textContent = t("ingProposalFail") + e.message; msgEl.className = "err"; }
+  }
+}
 
 /* ---------- 市場熱度（部署 #23；設計 v1.0） ----------
    快照表 crm_brand_hotness（sql-72）未執行前查詢會 404：分頁與儀表板卡
