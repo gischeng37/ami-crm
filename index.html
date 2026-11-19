@@ -118,6 +118,22 @@ a{color:var(--accent)}
 .lrow .dm{color:var(--muted);font-size:13px;word-break:break-all}
 .lrow .num{font-variant-numeric:tabular-nums;white-space:nowrap}
 .lrow .acts{display:flex;gap:6px;flex-wrap:wrap}
+/* 新增名單按日期統計（部署 #22，設計 v1.0）：統計列沿用 .lrow 行樣式概念，整行是按鈕 */
+.dshead{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.dsgran{display:flex;gap:6px;flex-wrap:wrap}
+.dsgran-btn{min-height:44px}
+.dsgran-btn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.dsrange{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-top:10px}
+.dsrange label{font-size:12px;color:var(--muted)}
+.dsrange input[type=date]{min-height:44px}
+.dsrange .btn{min-height:44px}
+.dsrow{display:grid;grid-template-columns:1.2fr .6fr 1.6fr;gap:10px;align-items:center;width:100%;text-align:left;background:#fff;color:inherit;border:0;border-bottom:1px solid var(--line);padding:12px 8px;cursor:pointer;font:inherit;min-height:44px}
+.dsrow:hover{background:#f7fafc}
+.dsrow.on{background:#eaf4fa;box-shadow:inset 3px 0 0 var(--accent)}
+.dsrow .dslab{font-weight:700}
+.dsrow .dsnum{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
+.dsrow .dssrc{color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#dsClearBtn{min-height:44px}
 .tag.green{background:#e6f4ea;color:#067647;font-weight:700}
 .tag.grey{background:#eceef0;color:#667085;font-weight:700}
 .formrow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
@@ -132,6 +148,8 @@ a{color:var(--accent)}
   .lrow{grid-template-columns:1fr 1fr;row-gap:4px}
   .lrow.head{display:none}
   .lrow .acts{grid-column:1/-1}
+  .dsrow{grid-template-columns:1fr 1fr;row-gap:4px}
+  .dsrow .dssrc{grid-column:1/-1}
   .lrow [data-l]::before{content:attr(data-l) "：";color:var(--muted);font-size:12px}
   .kv{grid-template-columns:1fr}
   .kv dt{margin-top:6px}
@@ -146,6 +164,8 @@ a{color:var(--accent)}
   .panel{padding:14px}
   .stat b{font-size:19px}
   .bfgrid{grid-template-columns:1fr 1fr}
+  .dsrow{grid-template-columns:1fr;border:1px solid var(--line);border-radius:8px;margin:8px 0;padding:10px 12px}
+  .dsrange{flex-direction:column;align-items:stretch}
 }
 </style>
 </head>
@@ -256,6 +276,25 @@ a{color:var(--accent)}
     <div id="leadsView" class="hidden">
       <div class="card">
         <div class="stats" id="leadsStats"></div>
+      </div>
+      <!-- 新增名單按日期統計（部署 #22，設計 v1.0） -->
+      <div class="card" id="leadDateCard">
+        <div class="dshead">
+          <b data-i18n="leadDateTitle">新增名單統計</b>
+          <div class="dsgran" role="group">
+            <button type="button" class="btn small dsgran-btn on" data-gran="day" data-i18n="leadDateDay">日</button>
+            <button type="button" class="btn small ghost dsgran-btn" data-gran="week" data-i18n="leadDateWeek">週</button>
+            <button type="button" class="btn small ghost dsgran-btn" data-gran="month" data-i18n="leadDateMonth">月</button>
+          </div>
+        </div>
+        <div class="dsrange">
+          <div><label data-i18n="leadDateFrom">自</label><input id="dsFrom" type="date"></div>
+          <div><label data-i18n="leadDateTo">至</label><input id="dsTo" type="date"></div>
+          <button id="dsLast30Btn" class="btn ghost small" type="button" data-i18n="leadDateLast30">最近 30 天</button>
+        </div>
+        <div id="leadDateRows"></div>
+        <div id="leadDateEmpty" class="empty hidden" data-i18n="leadDateEmpty">這段期間沒有新增名單。</div>
+        <div style="margin-top:8px"><button id="dsClearBtn" class="btn ghost small hidden" type="button" data-i18n="leadDateClear">✕ 清除日期篩選</button></div>
       </div>
       <div class="card">
         <div class="lfilters">
@@ -459,6 +498,11 @@ const I18N = {
     leadActionFail:"操作失敗：", leadNoDomain:"這家沒有網域，無法晉升（主檔網域為必填且唯一，請先補網域）。",
     leadNoResult:"沒有符合的名單。", leadShowing:"名單共 {n} 筆，顯示 {m} 筆",
     leadStatTotal:"名單總數", leadStatNew:"新名單", leadStatPromoted:"已晉升", leadStatResearched:"已研究",
+    leadDateTitle:"新增名單統計", leadDateDay:"日", leadDateWeek:"週", leadDateMonth:"月",
+    leadDateFrom:"自", leadDateTo:"至", leadDateLast30:"最近 30 天",
+    leadDateEmpty:"這段期間沒有新增名單。", leadDateUnknown:"日期不明",
+    leadDateWeekLabel:"{d} 週", leadDateClear:"✕ 清除日期篩選",
+    leadDateShowing:"名單共 {n} 筆，顯示 {m} 筆（{d} 新增）",
     researchDone:"研究完成",
     researchStateNone:"未研究", researchStateRequested:"已請求", researchStateInProgress:"研究中",
     researchStateDone:"已研究", researchStateFailed:"研究失敗",
@@ -581,6 +625,11 @@ const I18N = {
     leadActionFail:"Action failed: ", leadNoDomain:"This lead has no domain, so it cannot be promoted (company domain is required and unique — add a domain first).",
     leadNoResult:"No matching leads.", leadShowing:"{n} leads in total, showing {m}",
     leadStatTotal:"Total leads", leadStatNew:"New", leadStatPromoted:"Promoted", leadStatResearched:"Researched",
+    leadDateTitle:"New leads by date", leadDateDay:"Day", leadDateWeek:"Week", leadDateMonth:"Month",
+    leadDateFrom:"From", leadDateTo:"To", leadDateLast30:"Last 30 days",
+    leadDateEmpty:"No new leads in this period.", leadDateUnknown:"Unknown date",
+    leadDateWeekLabel:"Week of {d}", leadDateClear:"✕ Clear date filter",
+    leadDateShowing:"{n} leads in total, showing {m} ({d} added)",
     researchDone:"Research done",
     researchStateNone:"Not researched", researchStateRequested:"Requested", researchStateInProgress:"Researching",
     researchStateDone:"Researched", researchStateFailed:"Research failed",
@@ -841,7 +890,7 @@ function signOut(silent) {
   session = null;
   localStorage.removeItem("crm_session");
   companies = []; current = null;
-  leads = []; leadsLoaded = false; leadsLoadPromise = null; leadBusy = null;
+  leads = []; leadsLoaded = false; leadsLoadPromise = null; leadBusy = null; leadDateFilter = null;
   showMainTab("companies");
   closeDetail();
   showLogin();
@@ -1657,9 +1706,11 @@ function filteredLeads() {
     (!q || (l.brand || "").toLowerCase().includes(q)) &&
     (!band || (l.revenue_band || "").indexOf(band) === 0) &&
     (!tier || String(l.tier) === tier) &&
-    (!st || l.status === st));
+    (!st || l.status === st) &&
+    leadDateMatch(l));
 }
 function renderLeadsStats() {
+  renderLeadDateStats();   // 日期統計與現有統計同步刷新（含語言切換）
   const el = $("#leadsStats");
   if (!leads.length) { el.innerHTML = ""; return; }
   const n = f => leads.filter(f).length;
@@ -1673,12 +1724,19 @@ function renderLeadsStats() {
 }
 const LEAD_PAGE_SIZE = 50;
 let leadPage = 1;
+/* 新增名單按日期統計（部署 #22，設計 v1.0）：leadDateFilter 為 null 時不影響現有行為；
+   有值時為 {kind:"day"|"week"|"month"|"unknown", key, start, end}，start／end 為本地日期 YYYY-MM-DD */
+let leadDateGran = "day";
+let leadDateFilter = null;
+let leadDateRangeCustom = false;
 function renderLeads() {
   const list = filteredLeads();
   const totalPages = Math.max(1, Math.ceil(list.length / LEAD_PAGE_SIZE));
   if (leadPage > totalPages) leadPage = totalPages;
   const start = (leadPage - 1) * LEAD_PAGE_SIZE;
-  $("#leadsMeta").textContent = t("leadShowing").replace("{n}", leads.length).replace("{m}", list.length);
+  $("#leadsMeta").textContent = leadDateFilter
+    ? t("leadDateShowing").replace("{n}", leads.length).replace("{m}", list.length).replace("{d}", leadDateFilterLabel(leadDateFilter))
+    : t("leadShowing").replace("{n}", leads.length).replace("{m}", list.length);
   const box = $("#leadsList");
   box.innerHTML = "";
   $("#leadsEmpty").classList.toggle("hidden", list.length > 0);
@@ -1717,6 +1775,154 @@ function renderLeads() {
   });
   renderPager($("#leadPager"), leadPage, totalPages, list.length, start, LEAD_PAGE_SIZE, p => { leadPage = p; renderLeads(); });
 }
+/* ---------- 新增名單按日期統計（部署 #22，設計 v1.0） ----------
+   日期＝created_at 的瀏覽器本地日期。全部前端計算，不動資料庫。
+   篩選後的列表沿用現有 renderLeads() 渲染：行內晉升／拒絕鈕、單擊開明細
+   （明細內編輯、研究、Apollo）全部保留，不是唯讀副本。 */
+function localDateStr(d) {
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function parseLocalDate(s) { const p = s.split("-"); return new Date(+p[0], +p[1] - 1, +p[2]); }
+function leadLocalDate(l) {
+  if (!l.created_at) return null;
+  const d = new Date(l.created_at);
+  return isNaN(d) ? null : localDateStr(d);
+}
+function leadBucketKey(localDate, gran) {
+  if (gran === "month") return localDate.slice(0, 7);
+  if (gran === "week") {
+    const d = parseLocalDate(localDate);
+    const off = (d.getDay() + 6) % 7;   // 週一起算
+    return localDateStr(new Date(d.getFullYear(), d.getMonth(), d.getDate() - off));
+  }
+  return localDate;
+}
+function dsFilterForKey(kind, key) {
+  if (kind === "unknown") return { kind: "unknown", key: "__unknown__", start: null, end: null };
+  if (kind === "month") {
+    const y = +key.slice(0, 4), m = +key.slice(5, 7);
+    return { kind: "month", key, start: key + "-01", end: localDateStr(new Date(y, m, 0)) };
+  }
+  if (kind === "week") {
+    const mon = parseLocalDate(key);
+    return { kind: "week", key, start: key, end: localDateStr(new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 6)) };
+  }
+  return { kind: "day", key, start: key, end: key };
+}
+function sameDsFilter(a, b) { return !!a && !!b && a.kind === b.kind && a.key === b.key; }
+function leadDateFilterLabel(f) {
+  if (!f) return "";
+  if (f.kind === "unknown") return t("leadDateUnknown");
+  if (f.kind === "week") return t("leadDateWeekLabel").replace("{d}", f.key);
+  return f.key;
+}
+function leadDateMatch(l) {
+  if (!leadDateFilter) return true;
+  const ds = leadLocalDate(l);
+  if (leadDateFilter.kind === "unknown") return ds === null;
+  if (!ds) return false;
+  return ds >= leadDateFilter.start && ds <= leadDateFilter.end;
+}
+function setLeadDateRangeDefault() {
+  const today = new Date();
+  const end = localDateStr(today);
+  let start;
+  if (leadDateGran === "week") start = localDateStr(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 83));
+  else if (leadDateGran === "month") start = localDateStr(new Date(today.getFullYear(), today.getMonth() - 11, 1));
+  else start = localDateStr(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 29));
+  $("#dsFrom").value = start; $("#dsTo").value = end;
+}
+function clearLeadDateFilter() {
+  leadDateFilter = null;
+  renderLeadDateStats(); leadPage = 1; renderLeads();
+}
+function renderLeadDateStats() {
+  const box = $("#leadDateRows");
+  if (!box) return;
+  if (!$("#dsFrom").value || !$("#dsTo").value) { leadDateRangeCustom = false; setLeadDateRangeDefault(); }
+  const from = $("#dsFrom").value, to = $("#dsTo").value;
+  const groups = new Map();   // bucket key -> {n, sources:{}}
+  let unknown = 0;
+  for (const l of leads) {
+    const ds = leadLocalDate(l);
+    if (ds === null) { unknown++; continue; }
+    if (ds < from || ds > to) continue;
+    const key = leadBucketKey(ds, leadDateGran);
+    let g = groups.get(key);
+    if (!g) { g = { n: 0, sources: {} }; groups.set(key, g); }
+    g.n++;
+    const s = l.source || "";
+    if (s) g.sources[s] = (g.sources[s] || 0) + 1;
+  }
+  const keys = [...groups.keys()].sort().reverse();   // 倒序（最新在上）
+  const showUnknown = unknown > 0 && keys.length > 0;
+  /* 範圍內零新增（無日期分組）時顯示空狀態、不顯示空表；日期不明的列只在有日期分組時附在最末一行 */
+  $("#leadDateEmpty").classList.toggle("hidden", keys.length > 0);
+  box.innerHTML = "";
+  for (const key of keys) {
+    const g = groups.get(key);
+    let topSrc = "";
+    for (const s of Object.keys(g.sources)) if (!topSrc || g.sources[s] > g.sources[topSrc]) topSrc = s;
+    const f = dsFilterForKey(leadDateGran, key);
+    const on = sameDsFilter(leadDateFilter, f);
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "dsrow" + (on ? " on" : "");
+    b.dataset.dskey = key;
+    b.dataset.dskind = leadDateGran;
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+    b.innerHTML =
+      `<span class="dslab">${esc(leadDateGran === "week" ? t("leadDateWeekLabel").replace("{d}", key) : key)}</span>` +
+      `<span class="dsnum">${g.n}</span>` +
+      `<span class="dssrc">${topSrc ? esc(t("importStNew") + " · " + topSrc) : ""}</span>`;
+    box.appendChild(b);
+  }
+  if (showUnknown) {
+    const f = dsFilterForKey("unknown");
+    const on = sameDsFilter(leadDateFilter, f);
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "dsrow" + (on ? " on" : "");
+    b.dataset.dskey = "__unknown__";
+    b.dataset.dskind = "unknown";
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+    b.innerHTML =
+      `<span class="dslab">${esc(t("leadDateUnknown"))}</span>` +
+      `<span class="dsnum">${unknown}</span>` +
+      `<span class="dssrc"></span>`;
+    box.appendChild(b);
+  }
+  $("#dsClearBtn").classList.toggle("hidden", !leadDateFilter);
+}
+$("#leadDateRows").addEventListener("click", e => {
+  const btn = e.target.closest("[data-dskey]");
+  if (!btn) return;
+  const f = dsFilterForKey(btn.dataset.dskind, btn.dataset.dskey === "__unknown__" ? null : btn.dataset.dskey);
+  if (sameDsFilter(leadDateFilter, f)) clearLeadDateFilter();
+  else { leadDateFilter = f; leadPage = 1; renderLeads(); renderLeadDateStats(); }
+});
+$("#dsClearBtn").addEventListener("click", () => clearLeadDateFilter());
+document.querySelectorAll(".dsgran-btn").forEach(b => b.addEventListener("click", () => {
+  if (leadDateGran === b.dataset.gran) return;
+  leadDateGran = b.dataset.gran;
+  leadDateRangeCustom = false;
+  setLeadDateRangeDefault();
+  document.querySelectorAll(".dsgran-btn").forEach(x => {
+    const on = x === b;
+    x.classList.toggle("on", on);
+    x.classList.toggle("ghost", !on);
+  });
+  renderLeadDateStats();
+}));
+$("#dsFrom").addEventListener("change", () => { leadDateRangeCustom = true; renderLeadDateStats(); });
+$("#dsTo").addEventListener("change", () => { leadDateRangeCustom = true; renderLeadDateStats(); });
+$("#dsLast30Btn").addEventListener("click", () => {
+  const today = new Date();
+  $("#dsFrom").value = localDateStr(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 29));
+  $("#dsTo").value = localDateStr(today);
+  leadDateRangeCustom = false;
+  renderLeadDateStats();
+});
 /* ---------- 名單明細 ---------- */
 const LEAD_FIELD_LABEL = {
   brand: ["品牌", "Brand"], domain: ["網域", "Domain"], amazon_store_url: ["Amazon Store", "Amazon Store"],
@@ -2787,6 +2993,7 @@ async function rejectLead(lead) {
 });
 $("#lResetBtn").addEventListener("click", () => {
   $("#lq").value = ""; $("#fBand").value = ""; $("#fTier").value = ""; $("#fStatus").value = "";
+  leadDateFilter = null; renderLeadDateStats();
   leadPage = 1;
   renderLeads();
 });
